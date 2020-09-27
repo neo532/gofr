@@ -27,12 +27,12 @@ func init() {
 	)
 }
 
-func SetParam(param ...string) {
-	if len(param) > 0 {
-		ip = param[0]
+func SetParam(p ...string) {
+	if len(p) > 0 {
+		ip = p[0]
 	}
-	if len(param) > 1 {
-		pid = param[1]
+	if len(p) > 1 {
+		pid = p[1]
 	}
 	param = ip + pid
 }
