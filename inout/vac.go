@@ -55,7 +55,7 @@ func (this *verificationConversion) Do(ruleObjList map[string]*Rule) *verificati
 }
 
 func (this *verificationConversion) IsOk() bool {
-	return "" != this.err
+	return "" == this.err
 }
 
 func (this *verificationConversion) Param() map[string]string {
