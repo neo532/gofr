@@ -10,17 +10,17 @@ import (
 	"time"
 )
 
-type LockDb interface {
+type ILockDb interface {
 	Incr(key string) (int64, error)
-	Expire(key string, expiration time.Duration)
+	Expire(key string, expiration time.Duration) (bool, error)
 	Del(key string) (int64 error)
 }
 
 type Lock struct {
-	db LockDb
+	db ILockDb
 }
 
-func NewLock(d LockDb) *Lock {
+func NewLock(d ILockDb) *Lock {
 	return &Lock{
 		db: d,
 	}

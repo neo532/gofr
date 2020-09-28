@@ -13,10 +13,10 @@ import (
 	"github.com/neo532/gofr/lib"
 )
 
-type FreqDb interface {
+type IFreqDb interface {
 	Incr(key string) (int64, error)
-	Expire(key string, expiration time.Duration)
-	Get(key string) (string error)
+	Expire(key string, expiration time.Duration) (bool, error)
+	Get(key string) (string, error)
 }
 
 type FreqRule struct {
@@ -26,10 +26,10 @@ type FreqRule struct {
 
 type Freq struct {
 	tz *time.Location
-	db FreqDb
+	db IFreqDb
 }
 
-func NewFreq(d FreqDb) *Freq {
+func NewFreq(d IFreqDb) *Freq {
 	return &Freq{
 		db: d,
 	}
