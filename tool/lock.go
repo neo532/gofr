@@ -13,7 +13,7 @@ import (
 type ILockDb interface {
 	Incr(key string) (int64, error)
 	Expire(key string, expiration time.Duration) (bool, error)
-	Del(key string) (int64 error)
+	Del(key string) (int64, error)
 }
 
 type Lock struct {
@@ -28,7 +28,7 @@ func NewLock(d ILockDb) *Lock {
 
 //sec[0] : expireSec
 //sec[1] : waitSec
-func (this *Tool) Lock(key string, sec ...int) bool {
+func (this *Lock) Lock(key string, sec ...int) bool {
 	expireSec := 0
 	waitSec := 0
 	switch len(sec) {
