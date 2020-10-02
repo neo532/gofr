@@ -5,170 +5,293 @@ package inout
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
- */
+ * @demo NewVaC(map[string]IDo{
+	 "int641": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
+	 "str1": inout.NewStr("deff").IsGte(4).IsGte(10).InStr("asdfghjk"),
+ }).Do()
+*/
 
 import (
+	"errors"
 	"regexp"
 	"strconv"
-	"unicode/utf8"
 
 	"github.com/neo532/gofr/lib"
 )
 
-type verificationConversion struct {
-	inParam  map[string]string
-	outParam map[string]string
-	err      string
-}
-
 const (
-	ENUM       = `^[\w_,]{0,200}$`
-	INT        = `^\d{0,20}$`
-	NUM        = `^[-\d.]{0,50}$`
-	VERION     = `^\d(.\d+)*$`
-	MOBILE_CN  = `^1[^012]\d{9}$`
-	NO_SPECIAL = `^[^'";$\\]*$`
+	C_ENUM       = `^[\w_,]{0,200}$`
+	C_INT        = `^\d{0,18}$`
+	C_NUM        = `^[-\d.]{0,50}$`
+	C_VERION     = `^\d(.\d+)*$`
+	C_MOBILE_CN  = `^1[^012]\d{9}$`
+	C_NO_SPECIAL = `^[^'";$\\]*$`
 )
 
-func NewVaC(inParam map[string]string) *verificationConversion {
-	return &verificationConversion{
-		inParam:  inParam,
-		outParam: make(map[string]string),
-	}
+type verificationConversion struct {
+	err    error
+	fnList map[string]IDo
 }
 
-func (this *verificationConversion) Do(ruleObjList map[string]*Rule) *verificationConversion {
-	for field, ruleObj := range ruleObjList {
-		for _, fn := range ruleObj.fnList {
-			err, value := fn(this.inParam[field])
-			if err != "" {
-				if "nil" != ruleObj.def {
-					this.outParam[field] = ruleObj.def
-				}
-				this.err = lib.StrJoin(field, ":", err)
-				return this
-			}
-			this.outParam[field] = value
+func NewVaC(doList map[string]IDo) *verificationConversion {
+	return &verificationConversion{
+		fnList: doList,
+	}
+}
+func (this *verificationConversion) Do() *verificationConversion {
+	for field, doer := range this.fnList {
+		if err := doer.Do(); err != "" {
+			this.err = errors.New(lib.StrJoin(field, ":", err))
+			return this
 		}
 	}
 	return this
 }
 
+//func (this *verificationConversion) InValue(obj interface{}) *verificationConversion {
+//	objT := reflect.TypeOf(obj)
+//	objV := reflect.ValueOf(obj)
+//	switch {
+//	case objT.Kind() == reflect.Struct:
+//	case objT.Kind() == reflect.Ptr && objT.Elem().Kind() == reflect.Struct:
+//		objT = objT.Elem()
+//		objV = objV.Elem()
+//	default:
+//		this.err = fmt.Errorf("%v must be a struct or a struct pointer", obj)
+//		return this
+//	}
+//	for i := 0; i < objT.NumField(); i++ {
+//		field := objT.Field(i)
+//		fieldName := strings.ToLower(field.Name)
+//		switch objV.Field(i).Kind() {
+//		case reflect.String:
+//			this.fnList[fieldName].InStr(objV.FieldByName(field.Name).String())
+//		case reflect.Int64:
+//			this.fnList[fieldName].InInt64(objV.FieldByName(field.Name).String())
+//		case reflect.Int:
+//			this.fnList[fieldName].InInt(objV.FieldByName(field.Name).String())
+//		}
+//	}
+//	return this
+//}
 func (this *verificationConversion) IsOk() bool {
-	return "" == this.err
+	return nil == this.err
 }
-
-func (this *verificationConversion) Param() map[string]string {
-	return this.outParam
+func (this *verificationConversion) Int64(field string) int64 {
+	return this.fnList[field].Value().(int64)
 }
-
-func (this *verificationConversion) Err() string {
+func (this *verificationConversion) String(field string) string {
+	return this.fnList[field].Value().(string)
+}
+func (this *verificationConversion) Err() error {
 	return this.err
 }
 
 //========== rule ==========
-type Rule struct {
-	def      string
-	lenLte   int
-	lenGte   int
-	regexp   string
-	inArr    []string
-	inArrInt []int
-	inMap    map[string]string
 
-	fnList []func(value string) (string, string)
+type IDo interface {
+	Do() string
+	Value() interface{}
+	InStr(str string) IDo
+	InValue(val interface{}) IDo
 }
 
-func NewRule() *Rule {
-	return &Rule{
-		def: "nil",
+type Int struct {
+	gte     int64
+	lte     int64
+	inArr   []int
+	inValue int64
+
+	err    string
+	def    int64
+	value  int64
+	fnList []func() string
+}
+
+func NewInt(d ...int64) *Int {
+	if len(d) == 1 {
+		return &Int{
+			def: d[0],
+		}
 	}
+	return &Int{}
 }
-
-func (this *Rule) LenLte(min int) *Rule {
-	this.lenLte = min
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		if utf8.RuneCountInString(value) < this.lenLte {
-			return "Length is too short.", value
+func (this *Int) InStr(v string) IDo {
+	var err error
+	if this.inValue, err = strconv.ParseInt(v, 10, 64); nil != err {
+		this.err = err.Error()
+	}
+	return this
+}
+func (this *Int) InInt64(v int64) IDo {
+	this.inValue = v
+	return this
+}
+func (this *Int) InInt(v int) IDo {
+	this.inValue = int64(v)
+	return this
+}
+func (this *Int) InValue(v interface{}) IDo {
+	this.inValue = v.(int64)
+	return this
+}
+func (this *Int) IsGte(gte int) *Int {
+	this.gte = int64(gte)
+	this.fnList = append(this.fnList, func() string {
+		if this.inValue < this.gte {
+			return "Value is too small!"
 		}
-		return "", value
+		return ""
 	})
 	return this
 }
-
-func (this *Rule) LenGte(max int) *Rule {
-	this.lenGte = max
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		if utf8.RuneCountInString(value) > this.lenGte {
-			return "Length is too long.", value
+func (this *Int) IsLte(lte int) *Int {
+	this.lte = int64(lte)
+	this.fnList = append(this.fnList, func() string {
+		if this.inValue > this.lte {
+			return "Value is too large!"
 		}
-		return "", value
+		return ""
 	})
 	return this
 }
-
-func (this *Rule) RegExp(exp string) *Rule {
-	this.regexp = exp
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		if ok, _ := regexp.MatchString(this.regexp, value); ok {
-			return "", value
-		}
-		return "Wrong rule.", value
-	})
-	return this
-}
-
-func (this *Rule) InArr(enumList ...string) *Rule {
+func (this *Int) IsInArr(enumList ...int) *Int {
 	this.inArr = enumList
-	this.fnList = append(this.fnList, func(value string) (string, string) {
+	this.fnList = append(this.fnList, func() string {
 		for _, v := range this.inArr {
-			if v == value {
-				return "", value
+			if v == int(this.inValue) {
+				return ""
 			}
 		}
-		return "Don't have this item.", value
+		return "Don't have this item."
 	})
 	return this
 }
-
-func (this *Rule) InArrInt(enumList ...int) *Rule {
-	this.inArrInt = enumList
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		if item, ok := strconv.Atoi(value); ok != nil {
-			return "", value
-		} else {
-			for _, v := range this.inArrInt {
-				if v == item {
-					return "", value
-				}
-			}
+func (this *Int) Value() interface{} {
+	return this.value
+}
+func (this *Int) Do() string {
+	for _, fn := range this.fnList {
+		if this.err != "" {
+			return this.err
 		}
-		return "Don't have this item.", value
+		if err := fn(); err != "" {
+			if 0 != this.def {
+				this.value = this.def
+			}
+			return err
+		}
+		this.value = this.inValue
+	}
+	return ""
+}
+
+type String struct {
+	gte     int
+	lte     int
+	regexp  string
+	inArr   []string
+	inMap   map[string]string
+	inValue string
+
+	err    string
+	def    string
+	value  string
+	fnList []func() string
+}
+
+func NewStr(d ...string) *String {
+	if len(d) == 1 {
+		return &String{
+			def: d[0],
+		}
+	}
+	return &String{}
+}
+func (this *String) InStr(v string) IDo {
+	this.inValue = v
+	return this
+}
+func (this *String) InValue(v interface{}) IDo {
+	this.inValue = v.(string)
+	return this
+}
+func (this *String) IsGte(gte int) *String {
+	this.gte = gte
+	this.fnList = append(this.fnList, func() string {
+		if len(this.inValue) < this.gte {
+			return "Length is too short!"
+		}
+		return ""
 	})
 	return this
 }
-
-func (this *Rule) InMap(mapList map[string]string) *Rule {
+func (this *String) IsLte(lte int) *String {
+	this.lte = lte
+	this.fnList = append(this.fnList, func() string {
+		if len(this.inValue) > this.gte {
+			return "Length is too long!"
+		}
+		return ""
+	})
+	return this
+}
+func (this *String) RegExp(exp string) *String {
+	this.regexp = exp
+	this.fnList = append(this.fnList, func() string {
+		if ok, _ := regexp.MatchString(this.regexp, this.inValue); ok {
+			return ""
+		}
+		return "Wrong rule."
+	})
+	return this
+}
+func (this *String) IsInMap(mapList map[string]string) *String {
 	this.inMap = mapList
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		if item, ok := this.inMap[value]; ok {
-			return "", item
+	this.fnList = append(this.fnList, func() string {
+		if _, ok := this.inMap[this.inValue]; ok {
+			return ""
 		}
-		return "Don't have this item.", value
+		return "Don't have this item."
 	})
 	return this
 }
 
-func (this *Rule) Slash() *Rule {
-	this.fnList = append(this.fnList, func(value string) (string, string) {
-		return "", strconv.Quote(value)
+func (this *String) Slash() *String {
+	this.fnList = append(this.fnList, func() string {
+		return strconv.Quote(this.inValue)
 	})
 	return this
 }
-
-func (this *Rule) Def(def string) *Rule {
-	this.def = def
+func (this *String) IsInArr(enumList ...string) *String {
+	this.inArr = enumList
+	this.fnList = append(this.fnList, func() string {
+		for _, v := range this.inArr {
+			if v == this.inValue {
+				return ""
+			}
+		}
+		return "Don't have this item."
+	})
 	return this
+}
+func (this *String) Value() interface{} {
+	return this.value
+}
+func (this *String) Do() string {
+	for _, fn := range this.fnList {
+		if this.err != "" {
+			return this.err
+		}
+		if err := fn(); err != "" {
+			if "" != this.def {
+				this.value = this.def
+			}
+			return err
+		}
+		this.value = this.inValue
+	}
+	return ""
 }
 
 //========== /rule ==========
