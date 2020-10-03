@@ -4,7 +4,7 @@ package inout
  * Verification and Conversion for paramter
  * @author liuxiaofeng
  * @mail neo532@126.com
- * @date 2020-09-26
+ * @date 2020-10-03
  * @demo1 NewVaC(map[string]IDo{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
 		 "str1": inout.NewStr("deff").IsGte(4).IsGte(10).InStr("asdfghjk"),
