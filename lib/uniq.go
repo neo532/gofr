@@ -39,6 +39,7 @@ func SetParam(p ...string) {
 
 func UniqId(pre string) string {
 	return StrJoin(
+		pre,
 		param,
 		strconv.FormatInt(time.Now().Unix(), 10),
 		strconv.FormatUint(counter.Get(), 10),
