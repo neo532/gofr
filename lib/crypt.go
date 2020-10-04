@@ -15,7 +15,7 @@ const (
 	DICT36 = "abcdefghijklmnopqrstuvwxyz1234567890"
 )
 
-func EnNum2strByDict(num int64, dict string) string {
+func Num2strByDict(num int64, dict string) string {
 	var str strings.Builder
 	lenD := int64(len(dict))
 	for {
@@ -28,7 +28,7 @@ func EnNum2strByDict(num int64, dict string) string {
 	return Reverse(str.String())
 }
 
-func DeStr2numByDict(str string, dict string) int64 {
+func Str2numByDict(str string, dict string) int64 {
 	lenD := len(dict)
 	lenS := len(str)
 

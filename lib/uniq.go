@@ -22,8 +22,8 @@ var (
 func init() {
 	counter = NewAutoInc(0, 1)
 	SetParam(
-		EnNum2strByDict(int64(Ip2long(LocalIp())), DICT36),
-		EnNum2strByDict(int64(os.Getpid()), DICT36),
+		Num2strByDict(int64(Ip2long(LocalIp())), DICT36),
+		Num2strByDict(int64(os.Getpid()), DICT36),
 	)
 }
 
