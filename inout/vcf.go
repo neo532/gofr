@@ -30,18 +30,18 @@ import (
 	"github.com/neo532/gofr/lib"
 )
 
-//v* Verification
-//c* Conversion
-//f* Filter
+//V* Verification
+//C* Conversion
+//F* Filter
 const (
-	vEnum      = `^[\w_,]{0,200}$`
-	vInt       = `^\d{0,18}$`
-	vNum       = `^[-\d.]{0,50}$`
-	vVersion   = `^\d(.\d+)*$`
-	vMobileCn  = `^1[^012]\d{9}$`
-	vNoSpecial = `^[^'";$` + "`" + `]*$`
-	vBase64    = `^(?:[A-Za-z0-99+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`
-	vEmail     = `^[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+(?:\.[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[a-zA-Z0-9](?:[\w-]*[\w])?$`
+	Venum      = `^[\w_,]{0,200}$`
+	Vint       = `^\d{0,18}$`
+	Vnum       = `^[-\d.]{0,50}$`
+	Vversion   = `^\d(.\d+)*$`
+	VmobileCn  = `^1[^012]\d{9}$`
+	VnoSpecial = `^[^'";$` + "`" + `]*$`
+	Vbase64    = `^(?:[A-Za-z0-99+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`
+	Vemail     = `^[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+(?:\.[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[a-zA-Z0-9](?:[\w-]*[\w])?$`
 )
 
 // VerificationConversionFilter is a instance for Verification and Conversion.
