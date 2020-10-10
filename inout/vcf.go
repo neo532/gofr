@@ -1,7 +1,7 @@
 package inout
 
 /*
- * Verification and Conversion for paramter
+ * Verification,conversion and filter for paramter
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-03
@@ -37,7 +37,7 @@ const (
 	vEnum      = `^[\w_,]{0,200}$`
 	vInt       = `^\d{0,18}$`
 	vNum       = `^[-\d.]{0,50}$`
-	vVerion    = `^\d(.\d+)*$`
+	vVersion   = `^\d(.\d+)*$`
 	vMobileCn  = `^1[^012]\d{9}$`
 	vNoSpecial = `^[^'";$` + "`" + `]*$`
 	vBase64    = `^(?:[A-Za-z0-99+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`
