@@ -15,7 +15,7 @@ package inout
 	 }).InValueByStruct(&a{Num: 80, Str: "bbbbb"}).Do()
  * @demo3 NewVCF(map[string]IDo{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90),
-		 "str1": inout.NewStr("deff").IsGte(4).IsGte(10),
+		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10),
 	 }).InValueByStrMap(&map[string]string{"Num": "80", "Str": "bbbbb"}).Do()
 */
 
@@ -33,15 +33,15 @@ import (
 //V* Verification
 //C* Conversion
 //F* Filter
-const (
-	Venum      = `^[\w_,]{0,200}$`
-	Vint       = `^\d{0,18}$`
-	Vnum       = `^[-\d.]{0,50}$`
-	Vversion   = `^\d(.\d+)*$`
-	VmobileCn  = `^1[^012]\d{9}$`
-	VnoSpecial = `^[^'";$` + "`" + `]*$`
-	Vbase64    = `^(?:[A-Za-z0-99+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`
-	Vemail     = `^[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+(?:\.[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[a-zA-Z0-9](?:[\w-]*[\w])?$`
+var (
+	Venum      = regexp.MustCompile(`^[\w_,]{0,200}$`)
+	Vint       = regexp.MustCompile(`^\d{0,18}$`)
+	Vnum       = regexp.MustCompile(`^[-\d.]{0,50}$`)
+	Vversion   = regexp.MustCompile(`^\d(.\d+)*$`)
+	VmobileCn  = regexp.MustCompile(`^1[^012]\d{9}$`)
+	VnoSpecial = regexp.MustCompile(`^[^'";$` + "`" + `]*$`)
+	Vbase64    = regexp.MustCompile(`^(?:[A-Za-z0-99+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`)
+	Vemail     = regexp.MustCompile(`^[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+(?:\.[\w!#$%&'*+/=?^_` + "`" + `{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[a-zA-Z0-9](?:[\w-]*[\w])?$`)
 )
 
 // VerificationConversionFilter is a instance for Verification and Conversion.
@@ -365,7 +365,7 @@ func (f *Float) Do() string {
 type String struct {
 	gte    int
 	lte    int
-	regexp string
+	regexp *regexp.Regexp
 	inArr  []string
 	inMap  map[string]string
 
@@ -415,7 +415,7 @@ func (s *String) IsGte(gte int) *String {
 func (s *String) IsLte(lte int) *String {
 	s.lte = lte
 	s.fnList = append(s.fnList, func() string {
-		if len(s.inValue) > s.gte {
+		if len(s.inValue) > s.lte {
 			return "Length is too long!"
 		}
 		return ""
@@ -424,10 +424,10 @@ func (s *String) IsLte(lte int) *String {
 }
 
 // RegExp verifys a value whether it matches the regular expression.
-func (s *String) RegExp(exp string) *String {
+func (s *String) RegExp(exp *regexp.Regexp) *String {
 	s.regexp = exp
 	s.fnList = append(s.fnList, func() string {
-		if ok, _ := regexp.MatchString(s.regexp, s.inValue); ok {
+		if exp.MatchString(s.inValue) {
 			return ""
 		}
 		return "Wrong rule."
