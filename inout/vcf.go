@@ -58,27 +58,26 @@ func NewVCF(doList map[string]IDo) *VerificationConversionFilter {
 	}
 }
 
-// Do executes the this VerificationConversionFilter.
-func (vc *VerificationConversionFilter) Do() *VerificationConversionFilter {
-	for field, doer := range vc.fnList {
+// Do executes the this VerificationConversionFilter and break if it has error.
+func (vcf *VerificationConversionFilter) Do() *VerificationConversionFilter {
+	for field, doer := range vcf.fnList {
 		if err := doer.Do(); err != "" {
-			vc.err = errors.New(lib.StrJoin(field, ":", err))
-			return vc
+			vcf.err = errors.New(lib.StrJoin(field, ":", err))
 		}
 	}
-	return vc
+	return vcf
 }
 
 // InValueByStrMap inputs one map of string into this VerificationConversionFilter.
-func (vc *VerificationConversionFilter) InValueByStrMap(mapDL map[string]string) *VerificationConversionFilter {
+func (vcf *VerificationConversionFilter) InValueByStrMap(mapDL map[string]string) *VerificationConversionFilter {
 	for k, v := range mapDL {
-		vc.fnList[k].InStr(v)
+		vcf.fnList[k].InStr(v)
 	}
-	return vc
+	return vcf
 }
 
 // InValueByStruct inputs one struct into this VerificationConversionFilter.
-func (vc *VerificationConversionFilter) InValueByStruct(obj interface{}) *VerificationConversionFilter {
+func (vcf *VerificationConversionFilter) InValueByStruct(obj interface{}) *VerificationConversionFilter {
 	objT := reflect.TypeOf(obj)
 	objV := reflect.ValueOf(obj)
 	switch {
@@ -87,59 +86,59 @@ func (vc *VerificationConversionFilter) InValueByStruct(obj interface{}) *Verifi
 		objT = objT.Elem()
 		objV = objV.Elem()
 	default:
-		vc.err = fmt.Errorf("%v must be a struct or a struct pointer", obj)
-		return vc
+		vcf.err = fmt.Errorf("%v must be a struct or a struct pointer", obj)
+		return vcf
 	}
 	for i := 0; i < objT.NumField(); i++ {
 		field := objT.Field(i)
 		fieldName := strings.ToLower(field.Name)
 		switch objV.Field(i).Kind() {
 		case reflect.String:
-			vc.fnList[fieldName].InValue(objV.FieldByName(field.Name).String())
+			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).String())
 		case reflect.Float64:
-			vc.fnList[fieldName].InValue(objV.FieldByName(field.Name).Float())
+			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).Float())
 		case reflect.Int64:
 		case reflect.Int:
-			vc.fnList[fieldName].InValue(objV.FieldByName(field.Name).Int())
+			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).Int())
 		default:
-			vc.err = fmt.Errorf(
+			vcf.err = fmt.Errorf(
 				"%v isnot support type. string/float64/int64/int only",
 				objV.Field(i).Kind(),
 			)
-			return vc
+			return vcf
 		}
 	}
-	return vc
+	return vcf
 }
 
 // IsOk returns the total result of this VerificationConversionFilter by boolean.
-func (vc *VerificationConversionFilter) IsOk() bool {
-	return nil == vc.err
+func (vcf *VerificationConversionFilter) IsOk() bool {
+	return nil == vcf.err
 }
 
 // Err returns the error of this VerificationConversionFilter by error.
-func (vc *VerificationConversionFilter) Err() error {
-	return vc.err
+func (vcf *VerificationConversionFilter) Err() error {
+	return vcf.err
 }
 
 // Int returns this paramter result by int.
-func (vc *VerificationConversionFilter) Int(field string) int {
-	return vc.fnList[field].Value().(int)
+func (vcf *VerificationConversionFilter) Int(field string) int {
+	return vcf.fnList[field].Value().(int)
 }
 
 // Int64 returns this paramter result by int64.
-func (vc *VerificationConversionFilter) Int64(field string) int64 {
-	return vc.fnList[field].Value().(int64)
+func (vcf *VerificationConversionFilter) Int64(field string) int64 {
+	return vcf.fnList[field].Value().(int64)
 }
 
 // Float64 returns this paramter result by float64.
-func (vc *VerificationConversionFilter) Float64(field string) float64 {
-	return vc.fnList[field].Value().(float64)
+func (vcf *VerificationConversionFilter) Float64(field string) float64 {
+	return vcf.fnList[field].Value().(float64)
 }
 
 // String returns this paramter result by String.
-func (vc *VerificationConversionFilter) String(field string) string {
-	return vc.fnList[field].Value().(string)
+func (vcf *VerificationConversionFilter) String(field string) string {
+	return vcf.fnList[field].Value().(string)
 }
 
 //========== rule ==========
@@ -238,13 +237,16 @@ func (i *Int) IsInArr(enumList ...int) *Int {
 				return ""
 			}
 		}
-		return "Don't have i item."
+		return "Don't have this item."
 	})
 	return i
 }
 
 // Value returns this value by interface{}.
 func (i *Int) Value() interface{} {
+	if i.err != "" {
+		return i.def
+	}
 	return i.value
 }
 
@@ -254,11 +256,8 @@ func (i *Int) Do() string {
 		if i.err != "" {
 			return i.err
 		}
-		if err := fn(); err != "" {
-			if 0 != i.def {
-				i.value = i.def
-			}
-			return err
+		if i.err = fn(); i.err != "" {
+			return i.err
 		}
 		i.value = i.inValue
 	}
@@ -338,6 +337,9 @@ func (f *Float) IsLte(lte float64) *Float {
 
 // Value returns this value by interface{}.
 func (f *Float) Value() interface{} {
+	if f.err != "" {
+		return f.def
+	}
 	return f.value
 }
 
@@ -347,11 +349,8 @@ func (f *Float) Do() string {
 		if f.err != "" {
 			return f.err
 		}
-		if err := fn(); err != "" {
-			if 0 != f.def {
-				f.value = f.def
-			}
-			return err
+		if f.err = fn(); f.err != "" {
+			return f.err
 		}
 		f.value = f.inValue
 	}
@@ -442,7 +441,7 @@ func (s *String) IsInMap(mapList map[string]string) *String {
 		if _, ok := s.inMap[s.inValue]; ok {
 			return ""
 		}
-		return "Don't have s item."
+		return "Don't have this item."
 	})
 	return s
 }
@@ -464,13 +463,16 @@ func (s *String) IsInArr(enumList ...string) *String {
 				return ""
 			}
 		}
-		return "Don't have s item."
+		return "Don't have this item."
 	})
 	return s
 }
 
 // Value returns this value by interface{}.
 func (s *String) Value() interface{} {
+	if s.err != "" {
+		return s.def
+	}
 	return s.value
 }
 
@@ -480,11 +482,8 @@ func (s *String) Do() string {
 		if s.err != "" {
 			return s.err
 		}
-		if err := fn(); err != "" {
-			if "" != s.def {
-				s.value = s.def
-			}
-			return err
+		if s.err = fn(); s.err != "" {
+			return s.err
 		}
 		s.value = s.inValue
 	}
