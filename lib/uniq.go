@@ -1,10 +1,11 @@
+package lib
+
 /*
  * @abstract tool
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package lib
 
 import (
 	"os"
@@ -27,6 +28,7 @@ func init() {
 	)
 }
 
+// SetParam sets prefix for unique string.
 func SetParam(p ...string) {
 	if len(p) > 0 {
 		ip = p[0]
@@ -37,6 +39,7 @@ func SetParam(p ...string) {
 	param = ip + pid
 }
 
+// UniqId returns a unique string.
 func UniqId(pre string) string {
 	return StrJoin(
 		pre,

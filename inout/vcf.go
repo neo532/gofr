@@ -1,7 +1,7 @@
 package inout
 
 /*
- * Verification,conversion and filter for paramter
+ * Verification,conversion and filter for parameter
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-03
@@ -121,22 +121,22 @@ func (vcf *VerificationConversionFilter) Err() error {
 	return vcf.err
 }
 
-// Int returns this paramter result by int.
+// Int returns this parameter result by int.
 func (vcf *VerificationConversionFilter) Int(field string) int {
 	return vcf.fnList[field].Value().(int)
 }
 
-// Int64 returns this paramter result by int64.
+// Int64 returns this parameter result by int64.
 func (vcf *VerificationConversionFilter) Int64(field string) int64 {
 	return vcf.fnList[field].Value().(int64)
 }
 
-// Float64 returns this paramter result by float64.
+// Float64 returns this parameter result by float64.
 func (vcf *VerificationConversionFilter) Float64(field string) float64 {
 	return vcf.fnList[field].Value().(float64)
 }
 
-// String returns this paramter result by String.
+// String returns this parameter result by String.
 func (vcf *VerificationConversionFilter) String(field string) string {
 	return vcf.fnList[field].Value().(string)
 }
@@ -177,7 +177,7 @@ func NewInt(d ...int64) *Int {
 	return &Int{}
 }
 
-// InStr Inputs a paramter by String.
+// InStr Inputs a parameter by String.
 func (i *Int) InStr(v string) Ido {
 	var err error
 	if i.inValue, err = strconv.ParseInt(v, 10, 64); nil != err {
@@ -186,19 +186,19 @@ func (i *Int) InStr(v string) Ido {
 	return i
 }
 
-// InInt64 Inputs a paramter by int64.
+// InInt64 Inputs a parameter by int64.
 func (i *Int) InInt64(v int64) Ido {
 	i.inValue = v
 	return i
 }
 
-// InInt Inputs a paramter by int.
+// InInt Inputs a parameter by int.
 func (i *Int) InInt(v int) Ido {
 	i.inValue = int64(v)
 	return i
 }
 
-// InValue Inputs a paramter by interface{}.
+// InValue Inputs a parameter by interface{}.
 func (i *Int) InValue(v interface{}) Ido {
 	i.inValue = v.(int64)
 	return i
@@ -290,7 +290,7 @@ func NewFloat(d ...float64) *Float {
 	return &Float{}
 }
 
-// InStr Inputs a paramter by string.
+// InStr Inputs a parameter by string.
 func (f *Float) InStr(v string) Ido {
 	var err error
 	if f.inValue, err = strconv.ParseFloat(v, 64); nil != err {
@@ -299,13 +299,13 @@ func (f *Float) InStr(v string) Ido {
 	return f
 }
 
-// InFloat64 Inputs a paramter by float64.
+// InFloat64 Inputs a parameter by float64.
 func (f *Float) InFloat64(v float64) Ido {
 	f.inValue = v
 	return f
 }
 
-// InValue Inputs a paramter by interface{}.
+// InValue Inputs a parameter by interface{}.
 func (f *Float) InValue(v interface{}) Ido {
 	f.inValue = v.(float64)
 	return f
@@ -386,13 +386,13 @@ func NewStr(d ...string) *String {
 	return &String{}
 }
 
-// InStr Inputs a paramter by string.
+// InStr Inputs a parameter by string.
 func (s *String) InStr(v string) Ido {
 	s.inValue = v
 	return s
 }
 
-// InValue Inputs a paramter by interface{}.
+// InValue Inputs a parameter by interface{}.
 func (s *String) InValue(v interface{}) Ido {
 	s.inValue = v.(string)
 	return s

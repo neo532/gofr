@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// CompareVersion returns the num after comparing two versions.
 //ver1 > ver2 = 1
 //ver1 < ver2 = -1
 //ver1 = ver2 = 0
@@ -49,6 +50,7 @@ func CompareVersion(ver1, ver2 string) int {
 	return 0
 }
 
+// LocalIp returns the ip of local.
 func LocalIp() string {
 	def := "0.0.0.0"
 	eth0, err := net.InterfaceByName("eth0")

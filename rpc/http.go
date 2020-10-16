@@ -1,3 +1,5 @@
+package rpc
+
 /*
  * @abstract http request
  * @author liuxiaofeng
@@ -9,7 +11,6 @@
 		 Get("https://github.com")
  )
 */
-package rpc
 
 import (
 	"io"
@@ -41,12 +42,14 @@ type resp struct {
 	err      error
 }
 
+// Request is a instance of Request.
 type Request struct {
 	//log *log
 	req  req
 	resp resp
 }
 
+// NewHttp returns a instance of Request.
 func NewHttp() *Request {
 	return &Request{
 		req: req{
@@ -60,34 +63,45 @@ func NewHttp() *Request {
 	}
 }
 
+// Header sets the header for request.
 func (r *Request) Header(pl map[string]string) *Request {
 	r.req.header = pl
 	return r
 }
 
-//单位秒
+// Timeout sets the time of timeout for request.
 func (r *Request) Timeout(t time.Duration) *Request {
 	r.req.timeout = t
 	return r
 }
+
+// SuccCode sets the code of success for judging to result's status.
 func (r *Request) SuccCode(codeList []int) *Request {
 	for _, v := range codeList {
 		r.resp.succCode[v] = true
 	}
 	return r
 }
+
+// Retry sets the times of Retry for request.
 func (r *Request) Retry(times int) *Request {
 	return r
 }
+
+// Cookie sets the cookie for request.
 func (r *Request) Cookie(times int) *Request {
 	return r
 }
+
+// Get sends a request of get.
 func (r *Request) Get(url string) []byte {
 	r.req.url = url
 	r.req.method = "GET"
 	r.Do()
 	return r.resp.body
 }
+
+// Post sends a request of post.
 func (r *Request) Post(url string, param string) interface{} {
 	r.req.url = url
 	r.req.method = "POST"
@@ -95,6 +109,8 @@ func (r *Request) Post(url string, param string) interface{} {
 	r.Do()
 	return r.resp.body
 }
+
+// IsOk returns the result of request.
 func (r *Request) IsOk() bool {
 	if nil != r.resp.err {
 		return false
@@ -105,7 +121,8 @@ func (r *Request) IsOk() bool {
 	return false
 }
 
-//遵循RFC 3986编码，空格会被百分号编码(%20)
+// Map2url converts the string of map to a string.
+// The standard is the RFC 3986, the space will convert to %20.
 func Map2url(param map[string]string) string {
 	query := make(url.Values)
 	for k, v := range param {
@@ -114,6 +131,7 @@ func Map2url(param map[string]string) string {
 	return query.Encode()
 }
 
+// Do excutes the request.
 func (r *Request) Do() *Request {
 	client := &http.Client{Timeout: r.req.timeout}
 	reader := strings.NewReader(r.req.body)
@@ -145,28 +163,34 @@ func (r *Request) Do() *Request {
 }
 
 //========== use for post body ==========
+
+// Reader is instance of Reader.
 type Reader struct {
 	Reader io.ReaderAt
 	Offset int64
 }
 
+// NewReader returns a instance of Reader.
+func NewReader(reader io.ReaderAt) *Reader {
+	return &Reader{
+		Reader: reader,
+		Offset: 0,
+	}
+}
+
+// Read reads byte.
 func (p *Reader) Read(val []byte) (n int, err error) {
 	n, err = p.Reader.ReadAt(val, p.Offset)
 	p.Offset += int64(n)
 	return
 }
 
+// Close closes the reader.
 func (p *Reader) Close() error {
 	if rc, ok := p.Reader.(io.ReadCloser); ok {
 		return rc.Close()
 	}
 	return nil
-}
-func NewReader(reader io.ReaderAt) *Reader {
-	return &Reader{
-		Reader: reader,
-		Offset: 0,
-	}
 }
 
 //========== /use for post body ==========

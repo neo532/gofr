@@ -1,10 +1,11 @@
+package calc
+
 /*
  * the randomer
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package calc
 
 import (
 	"math/big"
@@ -49,6 +50,7 @@ func randFloat(min, max float64) float64 {
 	return rst
 }
 
+// RandArr return a array of interface after randoming key's order.
 func RandArr(arr []interface{}) []interface{} {
 	for i := len(arr) - 1; i > 0; i-- {
 		k := rand.Intn(i + 1)
@@ -57,6 +59,7 @@ func RandArr(arr []interface{}) []interface{} {
 	return arr
 }
 
+// RandArr return a array of map after randoming key's order.
 func RandArrOfMap(arr []map[string]interface{}) []map[string]interface{} {
 	for i := len(arr) - 1; i > 0; i-- {
 		k := rand.Intn(i + 1)

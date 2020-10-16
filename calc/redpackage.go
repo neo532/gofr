@@ -11,6 +11,7 @@ import (
 	"math/big"
 )
 
+// RedPkgList return a array of float64 by money and count.
 func RedPkgList(maxMoney float64, maxCount int) []float64 {
 	if maxMoney < float64(maxCount) {
 		return nil

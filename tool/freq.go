@@ -1,10 +1,11 @@
+package tool
+
 /*
  * @abstract frequency control
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package tool
 
 import (
 	"strconv"
@@ -13,33 +14,39 @@ import (
 	"github.com/neo532/gofr/lib"
 )
 
+// IFreqDb is the interface for FreqRule.
 type IFreqDb interface {
 	Incr(key string) (int64, error)
 	Expire(key string, expiration time.Duration) (bool, error)
 	Get(key string) (string, error)
 }
 
+// FreqRule is the instance for FreqRule.
 type FreqRule struct {
 	Duri  string //3|day
 	Times int
 }
 
+// Freq is the instance for FreqRule.
 type Freq struct {
 	tz *time.Location
 	db IFreqDb
 }
 
+// NewFreq returns a instance of Freq.
 func NewFreq(d IFreqDb) *Freq {
 	return &Freq{
 		db: d,
 	}
 }
 
+// Timezone sets the timezone for the day in FreqRule.
 func (f *Freq) Timezone(timezone string) *Freq {
 	f.tz, _ = time.LoadLocation(timezone)
 	return f
 }
 
+// Incr increments the count only.
 func (f *Freq) Incr(pre string, rule ...FreqRule) bool {
 	return f.freq(pre, rule, func(key string, expire, times int) bool {
 		tsOri, err := f.db.Incr(key)
@@ -54,6 +61,7 @@ func (f *Freq) Incr(pre string, rule ...FreqRule) bool {
 	})
 }
 
+// Check checks the count only.
 func (f *Freq) Check(pre string, rule ...FreqRule) bool {
 	return f.freq(pre, rule, func(key string, expire, times int) bool {
 		tsOri, e1 := f.db.Get(key)
@@ -68,6 +76,7 @@ func (f *Freq) Check(pre string, rule ...FreqRule) bool {
 	})
 }
 
+// IncrCheck increments and checks the count.
 func (f *Freq) IncrCheck(pre string, rule ...FreqRule) bool {
 	return f.freq(pre, rule, func(key string, expire, times int) bool {
 		tsOri, e1 := f.db.Incr(key)

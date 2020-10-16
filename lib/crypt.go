@@ -15,6 +15,7 @@ const (
 	DICT36 = "abcdefghijklmnopqrstuvwxyz1234567890"
 )
 
+// Num2strByDict converts the num to the string by the string of dictionary.
 func Num2strByDict(num int64, dict string) string {
 	var str strings.Builder
 	lenD := int64(len(dict))
@@ -28,6 +29,7 @@ func Num2strByDict(num int64, dict string) string {
 	return Reverse(str.String())
 }
 
+// Str2numByDict converts the result of Num2strByDict to a int64 by the string of dictionary.
 func Str2numByDict(str string, dict string) int64 {
 	lenD := len(dict)
 	lenS := len(str)

@@ -8,6 +8,7 @@ package lib
 
 import "runtime"
 
+// NewAutoInc is a instance for Counter.
 type AutoInc struct {
 	start uint64
 	step  uint64
@@ -15,6 +16,7 @@ type AutoInc struct {
 	queue chan uint64
 }
 
+// NewAutoInc return a instance of AutoInc.
 func NewAutoInc(iStart, iStep uint64) *AutoInc {
 	ai := &AutoInc{
 		start: iStart,
@@ -33,10 +35,12 @@ func (c *AutoInc) set() {
 	}
 }
 
+// Get return a uint64 of counter.
 func (c *AutoInc) Get() uint64 {
 	return <-c.queue
 }
 
+// Close close the counter.
 func (c *AutoInc) Close() {
 	c.bRun = false
 	close(c.queue)
