@@ -47,7 +47,7 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
 
     func main() {
         //You can input parameters with one struct,one map of string or one by one.
-        //Below is a method,inputting with one by one.
+        //The below is a method,inputting with one by one.
         vcf := inout.NewVCF(map[string]inout.Ido{
             "param_int1": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
             "param_str1": inout.NewStr("def1").IsGte(2).IsLte(5).InStr("string1"),
