@@ -7,11 +7,11 @@ package inout
  * @date 2020-10-03
  * @demo1 NewVCF(map[string]IDo{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
-		 "str1": inout.NewStr("deff").IsGte(4).IsGte(10).InStr("asdfghjk"),
+		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10).InStr("asdfghjk"),
 	 }).Do()
  * @demo2 NewVCF(map[string]IDo{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90),
-		 "str1": inout.NewStr("deff").IsGte(4).IsGte(10),
+		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10),
 	 }).InValueByStruct(&a{Num: 80, Str: "bbbbb"}).Do()
  * @demo3 NewVCF(map[string]IDo{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90),
