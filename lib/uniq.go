@@ -23,7 +23,7 @@ var (
 func init() {
 	counter = NewAutoInc(0, 1)
 	SetParam(
-		Num2strByDict(int64(Ip2long(LocalIp())), DICT36),
+		Num2strByDict(int64(IP2long(LocalIP())), DICT36),
 		Num2strByDict(int64(os.Getpid()), DICT36),
 	)
 }
@@ -39,8 +39,8 @@ func SetParam(p ...string) {
 	param = ip + pid
 }
 
-// UniqId returns a unique string.
-func UniqId(pre string) string {
+// UniqID returns a unique string.
+func UniqID(pre string) string {
 	return StrJoin(
 		pre,
 		param,

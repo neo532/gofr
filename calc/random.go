@@ -59,7 +59,7 @@ func RandArr(arr []interface{}) []interface{} {
 	return arr
 }
 
-// RandArr return a array of map after randoming key's order.
+// RandArrOfMap return a array of map after randoming key's order.
 func RandArrOfMap(arr []map[string]interface{}) []map[string]interface{} {
 	for i := len(arr) - 1; i > 0; i-- {
 		k := rand.Intn(i + 1)

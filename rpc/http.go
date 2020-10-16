@@ -49,8 +49,8 @@ type Request struct {
 	resp resp
 }
 
-// NewHttp returns a instance of Request.
-func NewHttp() *Request {
+// NewHTTP returns a instance of Request.
+func NewHTTP() *Request {
 	return &Request{
 		req: req{
 			timeout: 3 * time.Second,

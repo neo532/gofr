@@ -12,8 +12,8 @@ import (
 	"net"
 )
 
-// Ip2long converts the unit32 to the ip.
-func Ip2long(ipStr string) uint32 {
+// IP2long converts the unit32 to the ip.
+func IP2long(ipStr string) uint32 {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return 0

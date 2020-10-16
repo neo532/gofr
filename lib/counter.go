@@ -1,14 +1,15 @@
+package lib
+
 /*
  * @abstract ths auto incrementer
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package lib
 
 import "runtime"
 
-// NewAutoInc is a instance for Counter.
+// AutoInc is a instance for Counter.
 type AutoInc struct {
 	start uint64
 	step  uint64

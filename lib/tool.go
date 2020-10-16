@@ -1,10 +1,11 @@
+package lib
+
 /*
  * @abstract tool
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package lib
 
 import (
 	"net"
@@ -50,8 +51,8 @@ func CompareVersion(ver1, ver2 string) int {
 	return 0
 }
 
-// LocalIp returns the ip of local.
-func LocalIp() string {
+// LocalIP returns the ip of local.
+func LocalIP() string {
 	def := "0.0.0.0"
 	eth0, err := net.InterfaceByName("eth0")
 	if err != nil {

@@ -1,10 +1,11 @@
+package lib
+
 /*
  * @abstract string
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
  */
-package lib
 
 import (
 	"math"
