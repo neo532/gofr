@@ -5,15 +5,15 @@ package inout
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-03
- * @demo1 NewVCF(map[string]IDo{
+ * @demo1 NewVCF(map[string]Ido{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
 		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10).InStr("asdfghjk"),
 	 }).Do()
- * @demo2 NewVCF(map[string]IDo{
+ * @demo2 NewVCF(map[string]Ido{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90),
 		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10),
 	 }).InValueByStruct(&a{Num: 80, Str: "bbbbb"}).Do()
- * @demo3 NewVCF(map[string]IDo{
+ * @demo3 NewVCF(map[string]Ido{
 		 "int641": inout.NewInt().IsGte(10).IsLte(90),
 		 "str1": inout.NewStr("deff").IsGte(4).IsLte(10),
 	 }).InValueByStrMap(&map[string]string{"Num": "80", "Str": "bbbbb"}).Do()
@@ -48,11 +48,11 @@ var (
 // It contains the error and the list of function
 type VerificationConversionFilter struct {
 	err    error
-	fnList map[string]IDo
+	fnList map[string]Ido
 }
 
-// NewVCF returns a instance of VerificationConversionFilter by map of IDo.
-func NewVCF(doList map[string]IDo) *VerificationConversionFilter {
+// NewVCF returns a instance of VerificationConversionFilter by map of Ido.
+func NewVCF(doList map[string]Ido) *VerificationConversionFilter {
 	return &VerificationConversionFilter{
 		fnList: doList,
 	}
@@ -143,17 +143,17 @@ func (vcf *VerificationConversionFilter) String(field string) string {
 
 //========== rule ==========
 
-// IDo interface is to be implemented by Verification and Conversion.
-type IDo interface {
+// Ido interface is to be implemented by Verification and Conversion.
+type Ido interface {
 	Do() string
 	Value() interface{}
-	InStr(str string) IDo
-	InValue(val interface{}) IDo
+	InStr(str string) Ido
+	InValue(val interface{}) Ido
 }
 
 //---------- Int ----------
 
-// Int is a instance of IDo for parameter of int.
+// Int is a instance of Ido for parameter of int.
 type Int struct {
 	gte   int64
 	lte   int64
@@ -178,7 +178,7 @@ func NewInt(d ...int64) *Int {
 }
 
 // InStr Inputs a paramter by String.
-func (i *Int) InStr(v string) IDo {
+func (i *Int) InStr(v string) Ido {
 	var err error
 	if i.inValue, err = strconv.ParseInt(v, 10, 64); nil != err {
 		i.err = err.Error()
@@ -187,19 +187,19 @@ func (i *Int) InStr(v string) IDo {
 }
 
 // InInt64 Inputs a paramter by int64.
-func (i *Int) InInt64(v int64) IDo {
+func (i *Int) InInt64(v int64) Ido {
 	i.inValue = v
 	return i
 }
 
 // InInt Inputs a paramter by int.
-func (i *Int) InInt(v int) IDo {
+func (i *Int) InInt(v int) Ido {
 	i.inValue = int64(v)
 	return i
 }
 
 // InValue Inputs a paramter by interface{}.
-func (i *Int) InValue(v interface{}) IDo {
+func (i *Int) InValue(v interface{}) Ido {
 	i.inValue = v.(int64)
 	return i
 }
@@ -267,7 +267,7 @@ func (i *Int) Do() string {
 //---------- /Int ----------
 //---------- Float ----------
 
-// Float is a instance of IDo for parameter of float.
+// Float is a instance of Ido for parameter of float.
 type Float struct {
 	gte float64
 	lte float64
@@ -291,7 +291,7 @@ func NewFloat(d ...float64) *Float {
 }
 
 // InStr Inputs a paramter by string.
-func (f *Float) InStr(v string) IDo {
+func (f *Float) InStr(v string) Ido {
 	var err error
 	if f.inValue, err = strconv.ParseFloat(v, 64); nil != err {
 		f.err = err.Error()
@@ -300,13 +300,13 @@ func (f *Float) InStr(v string) IDo {
 }
 
 // InFloat64 Inputs a paramter by float64.
-func (f *Float) InFloat64(v float64) IDo {
+func (f *Float) InFloat64(v float64) Ido {
 	f.inValue = v
 	return f
 }
 
 // InValue Inputs a paramter by interface{}.
-func (f *Float) InValue(v interface{}) IDo {
+func (f *Float) InValue(v interface{}) Ido {
 	f.inValue = v.(float64)
 	return f
 }
@@ -360,7 +360,7 @@ func (f *Float) Do() string {
 //---------- /Int ----------
 //---------- String ----------
 
-// String is a instance of IDo for parameter of string.
+// String is a instance of Ido for parameter of string.
 type String struct {
 	gte    int
 	lte    int
@@ -387,13 +387,13 @@ func NewStr(d ...string) *String {
 }
 
 // InStr Inputs a paramter by string.
-func (s *String) InStr(v string) IDo {
+func (s *String) InStr(v string) Ido {
 	s.inValue = v
 	return s
 }
 
 // InValue Inputs a paramter by interface{}.
-func (s *String) InValue(v interface{}) IDo {
+func (s *String) InValue(v interface{}) Ido {
 	s.inValue = v.(string)
 	return s
 }
