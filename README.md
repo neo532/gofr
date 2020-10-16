@@ -39,7 +39,11 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
 ```go
     package main
 
-    import "github.com/neo532/gofr/inout"
+    import (
+        "fmt"
+        
+        "github.com/neo532/gofr/inout"
+    )
 
     func main() {
         //You can input parameters with one struct,one map of string or one by one.
