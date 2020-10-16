@@ -18,13 +18,13 @@ Gofr is a web framework written in Go (Golang).It aims to be a more easy framewo
 
 To install Gofr package, you need to install Go and set your Go workspace first.
 
-# 1. The first need [Go](https://golang.org/) installed (**version 1.12+ is required**), then you can use the below Go command to install Gofr.
+1. The first need [Go](https://golang.org/) installed (**version 1.12+ is required**), then you can use the below Go command to install Gofr.
 
 ```sh
     $ go get -u github.com/neo532/gofr
 ```
 
-# 2. Import it in your code:
+2. Import it in your code:
 
 ```go
     import "github.com/neo532/gofr"
