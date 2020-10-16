@@ -1,7 +1,7 @@
 # Gofr Web Framework
 
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/neo532/gofr)](https://goreportcard.com/report/github.com/neo532/gofr)
+[![Go Report Card](https://goreportcard.com/badge/github.com/neo532/gofr)](https://goreportcard.com/badge/github.com/neo532/gofr)
 [![Sourcegraph](https://sourcegraph.com/github.com/neo532/gofr/-/badge.svg)](https://sourcegraph.com/github.com/neo532/gofr?badge)
 
 Gofr is a web framework written in Go (Golang).It aims to be a more easy framework.
@@ -42,7 +42,7 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
     import "github.com/neo532/gofr/inout"
 
     func main() {
-        //You can input parameters with struct,one by one or map of string.
+        //You can input parameters with one struct,one map of string or one by one.
         //Below is a method,inputting with one by one.
         vcf := inout.NewVCF(map[string]inout.Ido{
             "param_int1": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
