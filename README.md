@@ -1,7 +1,7 @@
 # Gofr Web Framework
 
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/neo532/gofr)](https://goreportcard.com/badge/github.com/neo532/gofr)
+[![Go Report Card](https://goreportcard.com/badge/github.com/neo532/gofr)](https://goreportcard.com/report/github.com/neo532/gofr)
 [![Sourcegraph](https://sourcegraph.com/github.com/neo532/gofr/-/badge.svg)](https://sourcegraph.com/github.com/neo532/gofr?badge)
 
 Gofr is a web framework written in Go (Golang).It aims to be a more easy framework.
