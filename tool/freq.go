@@ -35,28 +35,28 @@ func NewFreq(d IFreqDb) *Freq {
 	}
 }
 
-func (this *Freq) Timezone(timezone string) *Freq {
-	this.tz, _ = time.LoadLocation(timezone)
-	return this
+func (f *Freq) Timezone(timezone string) *Freq {
+	f.tz, _ = time.LoadLocation(timezone)
+	return f
 }
 
-func (this *Freq) Incr(pre string, rule ...FreqRule) bool {
-	return this.freq(pre, rule, func(key string, expire, times int) bool {
-		tsOri, err := this.db.Incr(key)
+func (f *Freq) Incr(pre string, rule ...FreqRule) bool {
+	return f.freq(pre, rule, func(key string, expire, times int) bool {
+		tsOri, err := f.db.Incr(key)
 		if nil != err {
 			return false
 		}
 		ts := int(tsOri)
 		if ts == 1 {
-			this.db.Expire(key, time.Duration(expire)*time.Second)
+			f.db.Expire(key, time.Duration(expire)*time.Second)
 		}
 		return true
 	})
 }
 
-func (this *Freq) Check(pre string, rule ...FreqRule) bool {
-	return this.freq(pre, rule, func(key string, expire, times int) bool {
-		tsOri, e1 := this.db.Get(key)
+func (f *Freq) Check(pre string, rule ...FreqRule) bool {
+	return f.freq(pre, rule, func(key string, expire, times int) bool {
+		tsOri, e1 := f.db.Get(key)
 		if nil != e1 {
 			return false
 		}
@@ -68,15 +68,15 @@ func (this *Freq) Check(pre string, rule ...FreqRule) bool {
 	})
 }
 
-func (this *Freq) IncrCheck(pre string, rule ...FreqRule) bool {
-	return this.freq(pre, rule, func(key string, expire, times int) bool {
-		tsOri, e1 := this.db.Incr(key)
+func (f *Freq) IncrCheck(pre string, rule ...FreqRule) bool {
+	return f.freq(pre, rule, func(key string, expire, times int) bool {
+		tsOri, e1 := f.db.Incr(key)
 		if nil != e1 {
 			return false
 		}
 		ts := int(tsOri)
 		if ts == 1 {
-			this.db.Expire(key, time.Duration(int64(expire))*time.Second)
+			f.db.Expire(key, time.Duration(int64(expire))*time.Second)
 		}
 		if ts > times {
 			return false
@@ -85,7 +85,7 @@ func (this *Freq) IncrCheck(pre string, rule ...FreqRule) bool {
 	})
 }
 
-func (this *Freq) freq(pre string, ruleList []FreqRule, fn func(key string, expire, times int) bool) bool {
+func (f *Freq) freq(pre string, ruleList []FreqRule, fn func(key string, expire, times int) bool) bool {
 	var prekey = lib.StrJoin("freq:", pre, ":")
 	for _, r := range ruleList {
 		var key string

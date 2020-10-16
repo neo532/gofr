@@ -26,18 +26,18 @@ func NewAutoInc(iStart, iStep uint64) *AutoInc {
 	return ai
 }
 
-func (this *AutoInc) set() {
+func (c *AutoInc) set() {
 	defer func() { recover() }()
-	for i := this.start; this.bRun; i = i + this.step {
-		this.queue <- i
+	for i := c.start; c.bRun; i = i + c.step {
+		c.queue <- i
 	}
 }
 
-func (this *AutoInc) Get() uint64 {
-	return <-this.queue
+func (c *AutoInc) Get() uint64 {
+	return <-c.queue
 }
 
-func (this *AutoInc) Close() {
-	this.bRun = false
-	close(this.queue)
+func (c *AutoInc) Close() {
+	c.bRun = false
+	close(c.queue)
 }

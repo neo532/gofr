@@ -209,7 +209,7 @@ func (i *Int) IsGte(gte int) *Int {
 	i.gte = int64(gte)
 	i.fnList = append(i.fnList, func() string {
 		if i.inValue < i.gte {
-			return "Value is too small!"
+			return " Value is too small!"
 		}
 		return ""
 	})
@@ -221,7 +221,7 @@ func (i *Int) IsLte(lte int) *Int {
 	i.lte = int64(lte)
 	i.fnList = append(i.fnList, func() string {
 		if i.inValue > i.lte {
-			return "Value is too large!"
+			return " Value is too large!"
 		}
 		return ""
 	})
@@ -237,7 +237,7 @@ func (i *Int) IsInArr(enumList ...int) *Int {
 				return ""
 			}
 		}
-		return "Don't have this item."
+		return " Don't have this item."
 	})
 	return i
 }
@@ -316,7 +316,7 @@ func (f *Float) IsGte(gte float64) *Float {
 	f.gte = gte
 	f.fnList = append(f.fnList, func() string {
 		if f.inValue < f.gte {
-			return "Value is too small!"
+			return " Value is too small!"
 		}
 		return ""
 	})
@@ -328,7 +328,7 @@ func (f *Float) IsLte(lte float64) *Float {
 	f.lte = lte
 	f.fnList = append(f.fnList, func() string {
 		if f.inValue > f.lte {
-			return "Value is too large!"
+			return " Value is too large!"
 		}
 		return ""
 	})
@@ -403,7 +403,7 @@ func (s *String) IsGte(gte int) *String {
 	s.gte = gte
 	s.fnList = append(s.fnList, func() string {
 		if len(s.inValue) < s.gte {
-			return "Length is too short!"
+			return " Length is too short!"
 		}
 		return ""
 	})
@@ -415,7 +415,7 @@ func (s *String) IsLte(lte int) *String {
 	s.lte = lte
 	s.fnList = append(s.fnList, func() string {
 		if len(s.inValue) > s.lte {
-			return "Length is too long!"
+			return " Length is too long!"
 		}
 		return ""
 	})
@@ -429,7 +429,7 @@ func (s *String) RegExp(exp *regexp.Regexp) *String {
 		if exp.MatchString(s.inValue) {
 			return ""
 		}
-		return "Wrong rule."
+		return " Wrong rule."
 	})
 	return s
 }
@@ -438,10 +438,11 @@ func (s *String) RegExp(exp *regexp.Regexp) *String {
 func (s *String) IsInMap(mapList map[string]string) *String {
 	s.inMap = mapList
 	s.fnList = append(s.fnList, func() string {
-		if _, ok := s.inMap[s.inValue]; ok {
+		if v, ok := s.inMap[s.inValue]; ok {
+			s.inValue = v
 			return ""
 		}
-		return "Don't have this item."
+		return " Don't have this item."
 	})
 	return s
 }
@@ -449,7 +450,8 @@ func (s *String) IsInMap(mapList map[string]string) *String {
 // Slash converts the value by quote.
 func (s *String) Slash() *String {
 	s.fnList = append(s.fnList, func() string {
-		return strconv.Quote(s.inValue)
+		s.inValue = strconv.Quote(s.inValue)
+		return ""
 	})
 	return s
 }
@@ -463,7 +465,7 @@ func (s *String) IsInArr(enumList ...string) *String {
 				return ""
 			}
 		}
-		return "Don't have this item."
+		return " Don't have this item."
 	})
 	return s
 }

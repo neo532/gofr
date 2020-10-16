@@ -28,7 +28,7 @@ func NewLock(d ILockDb) *Lock {
 
 //sec[0] : expireSec
 //sec[1] : waitSec
-func (this *Lock) Lock(key string, sec ...int) bool {
+func (l *Lock) Lock(key string, sec ...int) bool {
 	expireSec := 0
 	waitSec := 0
 	switch len(sec) {
@@ -42,15 +42,15 @@ func (this *Lock) Lock(key string, sec ...int) bool {
 		return false
 	}
 
-	key = this.getKey(key)
+	key = l.getKey(key)
 	endTs := time.Now().Add(time.Duration(waitSec) * time.Second)
 	for {
 		if time.Now().After(endTs) {
 			break
 		}
 
-		if num, err := this.db.Incr(key); nil == err && num == 1 {
-			this.db.Expire(key, time.Duration(expireSec)*time.Second)
+		if num, err := l.db.Incr(key); nil == err && num == 1 {
+			l.db.Expire(key, time.Duration(expireSec)*time.Second)
 			return true
 		}
 
@@ -59,10 +59,10 @@ func (this *Lock) Lock(key string, sec ...int) bool {
 	return false
 }
 
-func (this *Lock) UnLock(key string) (int64, error) {
-	return this.db.Del(this.getKey(key))
+func (l *Lock) UnLock(key string) (int64, error) {
+	return l.db.Del(l.getKey(key))
 }
 
-func (this *Lock) getKey(key string) string {
+func (l *Lock) getKey(key string) string {
 	return "lock:" + key
 }
