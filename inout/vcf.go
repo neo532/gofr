@@ -97,8 +97,7 @@ func (vcf *VerificationConversionFilter) InValueByStruct(obj interface{}) *Verif
 			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).String())
 		case reflect.Float64:
 			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).Float())
-		case reflect.Int64:
-		case reflect.Int:
+		case reflect.Int, reflect.Int64:
 			vcf.fnList[fieldName].InValue(objV.FieldByName(field.Name).Int())
 		default:
 			vcf.err = fmt.Errorf(
