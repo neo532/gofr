@@ -50,20 +50,16 @@ func randFloat(min, max float64) float64 {
 	return rst
 }
 
-// RandArr return a array of interface after randoming key's order.
-func RandArr(arr []interface{}) []interface{} {
-	for i := len(arr) - 1; i > 0; i-- {
-		k := rand.Intn(i + 1)
-		arr[i], arr[k] = arr[k], arr[i]
-	}
-	return arr
+// IRandom is the interface for Random.
+type IRandom interface {
+	Len() int
+	Swap(i, j int)
 }
 
-// RandArrOfMap return a array of map after randoming key's order.
-func RandArrOfMap(arr []map[string]interface{}) []map[string]interface{} {
-	for i := len(arr) - 1; i > 0; i-- {
+// Rand shuffles the data's order.
+func Rand(data IRandom) {
+	for i := data.Len() - 1; i > 0; i-- {
 		k := rand.Intn(i + 1)
-		arr[i], arr[k] = arr[k], arr[i]
+		data.Swap(i, k)
 	}
-	return arr
 }
