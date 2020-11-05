@@ -17,7 +17,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func randFloat(min, max float64) float64 {
+func RandFloat(min, max float64) float64 {
 	if min >= max || 0 == max {
 		return max
 	}
@@ -50,16 +50,6 @@ func randFloat(min, max float64) float64 {
 	return rst
 }
 
-// IShuffle defines the standard of the shuffle.
-type IShuffle interface {
-	Len() int
-	Swap(i, j int)
-}
-
-// Shuffle shuffles the data's order.
-func Shuffle(data IShuffle) {
-	for i := data.Len() - 1; i > 0; i-- {
-		k := rand.Intn(i + 1)
-		data.Swap(i, k)
-	}
+func RandInt(n int) int {
+	return rand.Intn(n)
 }
