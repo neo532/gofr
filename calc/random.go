@@ -50,14 +50,14 @@ func randFloat(min, max float64) float64 {
 	return rst
 }
 
-// IRandom is the interface for Random.
-type IRandom interface {
+// IShuffle defines the standard of the shuffle.
+type IShuffle interface {
 	Len() int
 	Swap(i, j int)
 }
 
-// Rand shuffles the data's order.
-func Rand(data IRandom) {
+// Shuffle shuffles the data's order.
+func Shuffle(data IShuffle) {
 	for i := data.Len() - 1; i > 0; i-- {
 		k := rand.Intn(i + 1)
 		data.Swap(i, k)
