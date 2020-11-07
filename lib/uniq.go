@@ -36,7 +36,7 @@ func SetParam(p ...string) {
 	if len(p) > 1 {
 		pid = p[1]
 	}
-	param = ip + pid
+	param = ip + pid + Num2strByDict(time.Now().Unix(), DICT36)
 }
 
 // UniqID returns a unique string.
@@ -44,7 +44,6 @@ func UniqID(pre string) string {
 	return StrJoin(
 		pre,
 		param,
-		strconv.FormatInt(time.Now().Unix(), 10),
 		strconv.FormatUint(counter.Get(), 10),
 	)
 }
