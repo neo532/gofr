@@ -53,7 +53,7 @@ func CompareVersion(ver1, ver2 string) int {
 
 // LocalIP returns the ip of local.
 func LocalIP() string {
-	def := "0.0.0.0"
+	def := "127.0.0.1"
 
 	eth0, err := net.InterfaceByName("eth0")
 	if err != nil {
