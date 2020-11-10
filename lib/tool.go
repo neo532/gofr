@@ -8,7 +8,6 @@ package lib
  */
 
 import (
-	"net"
 	"strconv"
 	"strings"
 )
@@ -49,23 +48,4 @@ func CompareVersion(ver1, ver2 string) int {
 		}
 	}
 	return 0
-}
-
-// LocalIP returns the ip of local.
-func LocalIP() string {
-	def := "127.0.0.1"
-
-	eth0, err := net.InterfaceByName("eth0")
-	if err != nil {
-		return def
-	}
-
-	if ipList, err := eth0.Addrs(); err == nil {
-		for _, v := range ipList {
-			if ip := strings.Split(v.String(), "/"); len(ip) > 1 {
-				return ip[0]
-			}
-		}
-	}
-	return def
 }

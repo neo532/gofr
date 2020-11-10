@@ -10,6 +10,7 @@ package lib
 import (
 	"encoding/binary"
 	"net"
+	"strings"
 )
 
 // IP2long converts the unit32 to the ip.
@@ -28,4 +29,23 @@ func Long2ip(ipLong uint32) string {
 	binary.BigEndian.PutUint32(ipByte, ipLong)
 	ip := net.IP(ipByte)
 	return ip.String()
+}
+
+// LocalIP returns the ip of local.
+func LocalIP() string {
+	def := "127.0.0.1"
+
+	eth0, err := net.InterfaceByName("eth0")
+	if err != nil {
+		return def
+	}
+
+	if ipList, err := eth0.Addrs(); err == nil {
+		for _, v := range ipList {
+			if ip := strings.Split(v.String(), "/"); len(ip) > 1 {
+				return ip[0]
+			}
+		}
+	}
+	return def
 }
