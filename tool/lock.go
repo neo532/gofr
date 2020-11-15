@@ -50,13 +50,13 @@ func (l *Lock) Lock(key string, sec ...int) bool {
 	key = l.getKey(key)
 	endTs := time.Now().Add(time.Duration(waitSec) * time.Second)
 	for {
-		if time.Now().After(endTs) {
-			break
-		}
-
 		if num, err := l.db.Incr(key); nil == err && num == 1 {
 			l.db.Expire(key, time.Duration(expireSec)*time.Second)
 			return true
+		}
+
+		if time.Now().After(endTs) {
+			break
 		}
 
 		time.Sleep(time.Duration(50) * time.Millisecond)
