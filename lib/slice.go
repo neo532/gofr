@@ -1,6 +1,9 @@
 package lib
 
-import "sort"
+import (
+	"math/rand"
+	"sort"
+)
 
 /*
  * @abstract ISlice
@@ -97,6 +100,13 @@ func InSortSlice(needle interface{}, haystack ISlice) bool {
 		return true
 	}
 	return false
+}
+
+// ShuffleSlice shuffles the data's order.
+func ShuffleSlice(data ISlice) {
+	for i := data.Len() - 1; i > 0; i-- {
+		data.Swap(i, rand.Intn(i+1))
+	}
 }
 
 // Uint64Slice
