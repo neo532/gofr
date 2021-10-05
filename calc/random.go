@@ -17,6 +17,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// RandFloat returns a random float by input.
 func RandFloat(min, max float64) float64 {
 	if min >= max || 0 == max {
 		return max
@@ -50,6 +51,7 @@ func RandFloat(min, max float64) float64 {
 	return rst
 }
 
+// RandInt returns a random int by input.
 func RandInt(n int) int {
 	return rand.Intn(n)
 }

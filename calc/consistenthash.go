@@ -1,17 +1,17 @@
 package calc
 
+/*
+ * the consistenthasher
+ * @author liuxiaofeng
+ * @mail neo532@126.com
+ */
+
 import (
 	"hash/crc32"
 	"sort"
 	"strconv"
 	"sync"
 )
-
-/*
- * the consistenthasher
- * @author liuxiaofeng
- * @mail neo532@126.com
- */
 
 // ConsistentHash holds the information about consistent hashing.
 type ConsistentHash struct {
@@ -57,7 +57,7 @@ func (c *ConsistentHash) hash(key string) uint32 {
 	return crc32.ChecksumIEEE([]byte(key))
 }
 
-// Del adds the nodes of ConsistentHash by inputing nodes.
+// Add adds the nodes of ConsistentHash by inputing nodes.
 func (c *ConsistentHash) Add(nodeList ...string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
