@@ -3,18 +3,18 @@ package lib
 import "sort"
 
 /*
- * @abstract string
+ * @abstract ISlice
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2021-10-02
  */
 
-// IArray
-type IArray interface {
+// ISlice
+type ISlice interface {
 	Len() int
 	Value(i int) interface{}
-	Append(v interface{}) IArray
-	Make() IArray
+	Append(v interface{}) ISlice
+	Make() ISlice
 	LessValue(i int, v interface{}) bool
 
 	Less(i, j int) bool
@@ -22,8 +22,8 @@ type IArray interface {
 	IsRighType(v interface{}) bool
 }
 
-// UniqArray
-func UniqArray(ori IArray) IArray {
+// UniqSlice
+func UniqSlice(ori ISlice) ISlice {
 	var isUniq bool
 	var lenRst int
 	var lenOri = ori.Len()
@@ -44,8 +44,8 @@ func UniqArray(ori IArray) IArray {
 	return rst
 }
 
-// MinusArray
-func MinusArray(m, s IArray) (rst IArray) {
+// MinusSlice
+func MinusSlice(m, s ISlice) (rst ISlice) {
 	var isHas bool
 	var lenM = m.Len()
 	var lenS = s.Len()
@@ -65,8 +65,8 @@ func MinusArray(m, s IArray) (rst IArray) {
 	return
 }
 
-// IntersectArray
-func IntersectArray(o, t IArray) (rst IArray) {
+// IntersectSlice
+func IntersectSlice(o, t ISlice) (rst ISlice) {
 	var lenO = o.Len()
 	var lenT = t.Len()
 	rst = o.Make()
@@ -84,8 +84,8 @@ func IntersectArray(o, t IArray) (rst IArray) {
 	return rst
 }
 
-// InSortArray
-func InSortArray(needle interface{}, haystack IArray) bool {
+// InSortSlice
+func InSortSlice(needle interface{}, haystack ISlice) bool {
 	var l = haystack.Len()
 	if l == 0 || haystack.IsRighType(needle) == false {
 		return false
@@ -99,17 +99,17 @@ func InSortArray(needle interface{}, haystack IArray) bool {
 	return false
 }
 
-// Uint64Array
-type Uint64Array []uint64
+// Uint64Slice
+type Uint64Slice []uint64
 
-func (a Uint64Array) Len() int                            { return len(a) }
-func (a Uint64Array) Value(i int) interface{}             { return a[i] }
-func (a Uint64Array) Append(v interface{}) IArray         { return append(a, v.(uint64)) }
-func (a Uint64Array) Make() IArray                        { return make(Uint64Array, 0, a.Len()) }
-func (a Uint64Array) Less(i, j int) bool                  { return a.Value(i).(uint64) > a.Value(j).(uint64) }
-func (a Uint64Array) LessValue(i int, v interface{}) bool { return a.Value(i).(uint64) > v.(uint64) }
-func (a Uint64Array) Swap(i, j int)                       { a[i], a[j] = a[j], a[i] }
-func (a Uint64Array) IsRighType(v interface{}) bool {
+func (a Uint64Slice) Len() int                            { return len(a) }
+func (a Uint64Slice) Value(i int) interface{}             { return a[i] }
+func (a Uint64Slice) Append(v interface{}) ISlice         { return append(a, v.(uint64)) }
+func (a Uint64Slice) Make() ISlice                        { return make(Uint64Slice, 0, a.Len()) }
+func (a Uint64Slice) Less(i, j int) bool                  { return a.Value(i).(uint64) > a.Value(j).(uint64) }
+func (a Uint64Slice) LessValue(i int, v interface{}) bool { return a.Value(i).(uint64) > v.(uint64) }
+func (a Uint64Slice) Swap(i, j int)                       { a[i], a[j] = a[j], a[i] }
+func (a Uint64Slice) IsRighType(v interface{}) bool {
 	switch v.(type) {
 	case uint64:
 		return true
@@ -118,17 +118,17 @@ func (a Uint64Array) IsRighType(v interface{}) bool {
 	}
 }
 
-// StringArray
-type StringArray []string
+// StringSlice
+type StringSlice []string
 
-func (a StringArray) Len() int                            { return len(a) }
-func (a StringArray) Value(i int) interface{}             { return a[i] }
-func (a StringArray) Append(v interface{}) IArray         { return append(a, v.(string)) }
-func (a StringArray) Make() IArray                        { return make(StringArray, 0, a.Len()) }
-func (a StringArray) Less(i, j int) bool                  { return a.Value(i).(string) > a.Value(j).(string) }
-func (a StringArray) LessValue(i int, v interface{}) bool { return a.Value(i).(string) > v.(string) }
-func (a StringArray) Swap(i, j int)                       { a[i], a[j] = a[j], a[i] }
-func (a StringArray) IsRighType(v interface{}) bool {
+func (a StringSlice) Len() int                            { return len(a) }
+func (a StringSlice) Value(i int) interface{}             { return a[i] }
+func (a StringSlice) Append(v interface{}) ISlice         { return append(a, v.(string)) }
+func (a StringSlice) Make() ISlice                        { return make(StringSlice, 0, a.Len()) }
+func (a StringSlice) Less(i, j int) bool                  { return a.Value(i).(string) > a.Value(j).(string) }
+func (a StringSlice) LessValue(i int, v interface{}) bool { return a.Value(i).(string) > v.(string) }
+func (a StringSlice) Swap(i, j int)                       { a[i], a[j] = a[j], a[i] }
+func (a StringSlice) IsRighType(v interface{}) bool {
 	switch v.(type) {
 	case string:
 		return true
