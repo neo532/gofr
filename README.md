@@ -68,6 +68,7 @@ It is a powerful-tool of request.It contains log/retry.
     }
 ```
 
+<!--- Deprecated
 ## Validator
 
 It is a powerful-tool of verification,conversion and filter. So simply,good expansibility and good for using.
@@ -109,3 +110,4 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
         fmt.Println(vcf.String("param_str5")) // "\\"
     }
 ```
+-->
