@@ -22,11 +22,11 @@ func (s String) Append(v interface{}) ISlice { return append(s, v.(string)) }
 // Make makes a new instance.
 func (s String) Make() ISlice { return make(String, 0, s.Len()) }
 
-// Less compares two values.
-func (s String) Less(i, j int) bool { return s.Value(i).(string) > s.Value(j).(string) }
+// Less returns if first is less second.
+func (s String) Less(i, j int) bool { return s.Value(i).(string) < s.Value(j).(string) }
 
-// LessValue compare two values in different directory.
-func (s String) LessValue(i int, v interface{}) bool { return s.Value(i).(string) > v.(string) }
+// LessValue returns if first's Value is less v.
+func (s String) LessValue(i int, v interface{}) bool { return s.Value(i).(string) < v.(string) }
 
 // Swap swaps two value's position.
 func (s String) Swap(i, j int) { s[i], s[j] = s[j], s[i] }

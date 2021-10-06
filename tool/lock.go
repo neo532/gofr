@@ -13,9 +13,8 @@ package tool
 		cache *redis.Client
 	}
 
-	func (l *lockDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (err string) {
-		err, _ = l.cache.Eval(cmd, keys, args...).String()
-		return
+	func (l *lockDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+		return l.cache.Eval(cmd, keys, args...).Result()
 	}
 	var c = context.Background()
 	rdb := &lockDb{redis.NewClient(&redis.Options{
@@ -74,7 +73,7 @@ return '` + evalOk + `'
 
 // ILockDb is the interface for Lock's db.
 type ILockDb interface {
-	Eval(c context.Context, cmd string, keys []string, args []interface{}) (err string)
+	Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error)
 }
 
 // Lock is the instance for Lock.
@@ -92,8 +91,12 @@ func NewLock(d ILockDb) *Lock {
 // UnLock unlocks.
 func (l *Lock) UnLock(c context.Context, key string, code string) (err error) {
 	key = getLockKey(key)
-	e := l.db.Eval(c, unlockLuaScript, []string{key}, []interface{}{code})
-	if e == evalOk {
+	var rst interface{}
+	if rst, err = l.db.Eval(c, unlockLuaScript, []string{key}, []interface{}{code}); err != nil {
+		return
+	}
+	e, ok := rst.(string)
+	if ok && e == evalOk {
 		err = nil
 		return
 	}
@@ -108,9 +111,13 @@ func (l *Lock) Lock(c context.Context, key string, expire, wait time.Duration) (
 
 	endTs := time.Now().Add(wait)
 	for time.Now().Before(endTs) {
+		var rst interface{}
+		if rst, err = l.db.Eval(c, lockLuaScript, []string{key}, []interface{}{code, expire.Seconds()}); err != nil {
+			return
+		}
 
-		e := l.db.Eval(c, lockLuaScript, []string{key}, []interface{}{code, expire.Seconds()})
-		if e == evalOk {
+		e, ok := rst.(string)
+		if ok && e == evalOk {
 			err = nil
 			return
 		}
@@ -119,6 +126,9 @@ func (l *Lock) Lock(c context.Context, key string, expire, wait time.Duration) (
 		time.Sleep(time.Duration(50) * time.Millisecond)
 	}
 
+	if err == nil {
+		err = errors.New("timeout")
+	}
 	return
 }
 

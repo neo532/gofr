@@ -22,11 +22,11 @@ func (s Uint64) Append(v interface{}) ISlice { return append(s, v.(uint64)) }
 // Make makes a new instance.
 func (s Uint64) Make() ISlice { return make(Uint64, 0, s.Len()) }
 
-// Less compares two values.
-func (s Uint64) Less(i, j int) bool { return s.Value(i).(uint64) > s.Value(j).(uint64) }
+// Less returns if first is less second.
+func (s Uint64) Less(i, j int) bool { return s.Value(i).(uint64) < s.Value(j).(uint64) }
 
-// LessValue compare two values in different directory.
-func (s Uint64) LessValue(i int, v interface{}) bool { return s.Value(i).(uint64) > v.(uint64) }
+// LessValue returns if first's Value is less v.
+func (s Uint64) LessValue(i int, v interface{}) bool { return s.Value(i).(uint64) < v.(uint64) }
 
 // Swap swaps two value's position.
 func (s Uint64) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
