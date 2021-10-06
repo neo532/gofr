@@ -13,7 +13,7 @@ type String []string
 // Len return the length of String.
 func (s String) Len() int { return len(s) }
 
-// Append add a new value to String
+// Value add a new value to String
 func (s String) Value(i int) interface{} { return s[i] }
 
 // Append add a new value to String.
@@ -25,10 +25,10 @@ func (s String) Make() ISlice { return make(String, 0, s.Len()) }
 // Less compares two values.
 func (s String) Less(i, j int) bool { return s.Value(i).(string) > s.Value(j).(string) }
 
-// LessValue compare two values in different directroy.
+// LessValue compare two values in different directory.
 func (s String) LessValue(i int, v interface{}) bool { return s.Value(i).(string) > v.(string) }
 
-// Swap swaps two value's postion.
+// Swap swaps two value's position.
 func (s String) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 // IsRighType judges the value's type.
