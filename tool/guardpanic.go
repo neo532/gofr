@@ -1,10 +1,10 @@
 package tool
 
 /*
- * @abstract lock for multi-server in one redis instance
+ * @abstract guard panic
  * @author liuxiaofeng
  * @mail neo532@126.com
- * @date 2020-10-05
+ * @date 2020-10-06
  * @demo:
  */
 
@@ -15,12 +15,14 @@ import (
 	"runtime/debug"
 )
 
+// guardpanic is a statement of guardpanic.
 type guardpanic struct {
 	restartTimes  int
 	workerFn      func()
 	errCallBackFn func(err error)
 }
 
+// Recover is a method for panic.
 func (gp *guardpanic) Recover() {
 
 	if r := recover(); r != nil {
@@ -47,6 +49,7 @@ func (gp *guardpanic) Recover() {
 	}
 }
 
+// Run is a function for goroutine.
 func Run(worker func(), times int, cb func(err error)) {
 
 	gp := &guardpanic{
