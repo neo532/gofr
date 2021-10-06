@@ -1,10 +1,10 @@
 package request
 
 /*
- * @abstract http request
+ * @abstract logger for request
  * @author liuxiaofeng
  * @mail neo532@126.com
- * @date 2021-10-02
+ * @date 2021-10-06
  */
 
 import (

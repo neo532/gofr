@@ -1,5 +1,12 @@
 package request
 
+/*
+ * @abstract functions
+ * @author liuxiaofeng
+ * @mail neo532@126.com
+ * @date 2021-10-06
+ */
+
 import (
 	"bytes"
 	"fmt"
