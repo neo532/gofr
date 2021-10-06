@@ -9,7 +9,6 @@ package tool
  */
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -27,15 +26,18 @@ func (gp *guardpanic) Recover() {
 
 	if r := recover(); r != nil {
 
-		err := errors.New(
-			fmt.Sprintf("%s, %s", r, string(debug.Stack())),
-		)
-
-		if gp.errCallBackFn != nil {
-			gp.errCallBackFn(err)
-		} else {
-			fmt.Fprint(os.Stderr, err)
+		if gp.errCallBackFn == nil {
+			gp.errCallBackFn = func(err error) {
+				fmt.Fprint(os.Stderr, err)
+			}
 		}
+
+		gp.errCallBackFn(
+			fmt.Errorf("%s, %s",
+				r,
+				string(debug.Stack()),
+			),
+		)
 
 		if gp.restartTimes > 0 {
 
