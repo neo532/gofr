@@ -17,8 +17,9 @@ import (
 	"strings"
 )
 
-// Struct2String turn the struct data to string data.
+// Struct2ReqArgs turn the struct data to string data.
 func Struct2ReqArgs(param interface{}) (r string, err error) {
+
 	// unify type
 	T := reflect.TypeOf(param)
 	V := reflect.ValueOf(param)

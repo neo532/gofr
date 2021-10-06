@@ -4,6 +4,7 @@ package calc
  * the consistenthasher
  * @author liuxiaofeng
  * @mail neo532@126.com
+ * @date 2020-09-26
  */
 
 import (

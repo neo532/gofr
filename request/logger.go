@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// ========== logger ==========
 var logger Logger = &LoggerDefault{}
 
 // Logger is a interface for Log.

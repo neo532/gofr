@@ -40,7 +40,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const EVAL_OK = "ok"
+const evalOk = "ok"
 
 // args:1 keyName code 10
 var lockLuaScript = `
@@ -51,7 +51,7 @@ local rst=redis.call('SET', key, code, 'EX', expire, 'NX')
 if(rst==false) then
 	return 'set fail'
 end
-return '` + EVAL_OK + `'
+return '` + evalOk + `'
 `
 
 // args:1 keyName code
@@ -69,7 +69,7 @@ local rst=redis.call('DEL', key)
 if(rst==0) then
 	return 'del fail' 
 end
-return '` + EVAL_OK + `'
+return '` + evalOk + `'
 `
 
 // ILockDb is the interface for Lock's db.
@@ -93,7 +93,7 @@ func NewLock(d ILockDb) *Lock {
 func (l *Lock) UnLock(c context.Context, key string, code string) (err error) {
 	key = getLockKey(key)
 	e := l.db.Eval(c, unlockLuaScript, []string{key}, []interface{}{code})
-	if e == EVAL_OK {
+	if e == evalOk {
 		err = nil
 		return
 	}
@@ -110,7 +110,7 @@ func (l *Lock) Lock(c context.Context, key string, expire, wait time.Duration) (
 	for time.Now().Before(endTs) {
 
 		e := l.db.Eval(c, lockLuaScript, []string{key}, []interface{}{code, expire.Seconds()})
-		if e == EVAL_OK {
+		if e == evalOk {
 			err = nil
 			return
 		}

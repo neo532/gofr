@@ -30,8 +30,7 @@ import (
 	"time"
 )
 
-// ========== Param ==========
-// Param is Request's paramter.
+// Param is Request's parameter.
 type Param struct {
 	getArgs string
 
@@ -46,8 +45,6 @@ type Param struct {
 	Retry int
 	Limit time.Duration
 }
-
-// ========== Header ==========
 
 // Header returns Paramself by header.
 func (p Param) Header(header http.Header) Param {
@@ -64,13 +61,14 @@ func (p Param) Header(header http.Header) Param {
 	return p
 }
 
+// AddHeader can add one header to Param.
 func (p Param) AddHeader(key, value string) Param {
 	p.headerReq.Add(key, value)
 	p.headerCurl += fmtCurlOneHeader(key, value)
 	return p
 }
 
-// FollowLocation adds the header for the situation of 302 or 301.
+// HeaderFollowLocation adds the header for the situation of 302 or 301.
 func (p Param) HeaderFollowLocation() Param {
 	p.AddHeader("CURLOPT_FOLLOWLOCATION", "TRUE")
 	return p
@@ -106,7 +104,6 @@ func (p Param) Form(param interface{}) Param {
 	return p
 }
 
-// ========== HTTP ==========
 // DoHTTP does a HTTP for multi-times.
 func DoHTTP(
 	c context.Context,
