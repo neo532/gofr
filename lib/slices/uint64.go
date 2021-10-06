@@ -1,4 +1,4 @@
-package lib
+package slices
 
 /*
  * @abstract Uint64
@@ -10,28 +10,28 @@ package lib
 // Uint64
 type Uint64 []uint64
 
-// Len
+// Len returns the length of Uint64.
 func (s Uint64) Len() int { return len(s) }
 
-// Value
+// Value returns the value of Uint64.
 func (s Uint64) Value(i int) interface{} { return s[i] }
 
-// Append
+// Append add a new value to Uint64
 func (s Uint64) Append(v interface{}) ISlice { return append(s, v.(uint64)) }
 
-// Make
+// Make makes a new instance.
 func (s Uint64) Make() ISlice { return make(Uint64, 0, s.Len()) }
 
-// Less
+// Less compares two values.
 func (s Uint64) Less(i, j int) bool { return s.Value(i).(uint64) > s.Value(j).(uint64) }
 
-// LessValue
+// LessValue compare two values in different directroy.
 func (s Uint64) LessValue(i int, v interface{}) bool { return s.Value(i).(uint64) > v.(uint64) }
 
-// Swap
+// Swap swaps two value's postion.
 func (s Uint64) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-// IsRighType
+// IsRighType judges the value's type.
 func (s Uint64) IsRighType(v interface{}) bool {
 	switch v.(type) {
 	case uint64:

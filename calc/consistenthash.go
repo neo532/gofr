@@ -86,7 +86,7 @@ func (c *ConsistentHash) Del(nodeList ...string) {
 	}
 
 	var HL slots
-	for n, _ := range c.hash2node {
+	for n := range c.hash2node {
 		HL = append(HL, n)
 	}
 	sort.Sort(HL)

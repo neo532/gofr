@@ -15,6 +15,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/neo532/gofr/lib/slices"
 )
 
 // Struct2ReqArgs turn the struct data to string data.
@@ -37,21 +39,12 @@ func Struct2ReqArgs(param interface{}) (r string, err error) {
 	for i := 0; i < T.NumField(); i++ {
 		var field = T.Field(i)
 		var name = field.Name
-		var tag = strings.Split(field.Tag.Get("form"), ",")
+		var tag slices.String = strings.Split(field.Tag.Get("form"), ",")
 		var objField = V.Field(i)
 
 		// check if empty
-		if len(tag) > 1 {
-			isBreak := false
-			for _, v := range tag[1:] {
-				if v == "omitempty" {
-					isBreak = true
-					break
-				}
-			}
-			if isBreak == true && objField.IsZero() {
-				continue
-			}
+		if slices.In("omitempty", tag) && objField.IsZero() {
+			continue
 		}
 
 		b.WriteString("&")

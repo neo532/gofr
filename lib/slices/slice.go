@@ -1,4 +1,4 @@
-package lib
+package slices
 
 import (
 	"math/rand"
@@ -12,7 +12,7 @@ import (
  * @date 2021-10-02
  */
 
-// ISlice
+// ISlice is a interface for multi-type.
 type ISlice interface {
 	Len() int
 	Value(i int) interface{}
@@ -25,7 +25,7 @@ type ISlice interface {
 	IsRighType(v interface{}) bool
 }
 
-// Unique
+// Unique handles ISlice.
 func Unique(ori ISlice) ISlice {
 	var isUniq bool
 	var lenRst int
@@ -47,7 +47,7 @@ func Unique(ori ISlice) ISlice {
 	return rst
 }
 
-// Minus
+// Minus handles ISlice.
 func Minus(m, s ISlice) (rst ISlice) {
 	var isHas bool
 	var lenM = m.Len()
@@ -68,7 +68,7 @@ func Minus(m, s ISlice) (rst ISlice) {
 	return
 }
 
-// Intersect
+// Intersect handles ISlice.
 func Intersect(o, t ISlice) (rst ISlice) {
 	var lenO = o.Len()
 	var lenT = t.Len()
@@ -87,7 +87,21 @@ func Intersect(o, t ISlice) (rst ISlice) {
 	return rst
 }
 
-// InSort
+// In handles ISlice.
+func In(needle interface{}, haystack ISlice) bool {
+	var l = haystack.Len()
+	if l == 0 || haystack.IsRighType(needle) == false {
+		return false
+	}
+	for i := 0; i < l; i++ {
+		if needle == haystack.Value(i) {
+			return true
+		}
+	}
+	return false
+}
+
+// InSort handles ISlice.
 func InSort(needle interface{}, haystack ISlice) bool {
 	var l = haystack.Len()
 	if l == 0 || haystack.IsRighType(needle) == false {

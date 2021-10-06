@@ -1,4 +1,4 @@
-package lib
+package slices
 
 /*
  * @abstract String
@@ -7,31 +7,31 @@ package lib
  * @date 2021-10-06
  */
 
-// String
+// String is slice of string.
 type String []string
 
-// Len
+// Len return the length of String.
 func (s String) Len() int { return len(s) }
 
-// Value
-func (s String) Value(i int) interface{} { return a[i] }
+// Append add a new value to String
+func (s String) Value(i int) interface{} { return s[i] }
 
-// Append
+// Append add a new value to String.
 func (s String) Append(v interface{}) ISlice { return append(s, v.(string)) }
 
-// Make
+// Make makes a new instance.
 func (s String) Make() ISlice { return make(String, 0, s.Len()) }
 
-// Less
+// Less compares two values.
 func (s String) Less(i, j int) bool { return s.Value(i).(string) > s.Value(j).(string) }
 
-// LessValue
+// LessValue compare two values in different directroy.
 func (s String) LessValue(i int, v interface{}) bool { return s.Value(i).(string) > v.(string) }
 
-// Swap
+// Swap swaps two value's postion.
 func (s String) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-// IsRighType
+// IsRighType judges the value's type.
 func (s String) IsRighType(v interface{}) bool {
 	switch v.(type) {
 	case string:
