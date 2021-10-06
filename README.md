@@ -30,6 +30,44 @@ To install Gofr package, you need to install Go and set your Go workspace first.
     import "github.com/neo532/gofr"
 ```
 
+## HTTP request
+
+It is a powerful-tool of request.It contains log/retry.
+
+[click me to code](https://github.com/neo532/gofr/blob/master/request)
+
+```go
+    package main
+
+    import (
+        "github.com/neo532/gofr/request"
+    )
+
+	type ReqParam struct {
+		Directory string `form:"directory"`
+	}
+	type Body struct {
+		Directory string `json:"directory"`
+	}
+
+    func main() {
+
+        // register logger if you like.
+        // gofr/request/logger.go
+
+        // request:
+        var p = request.Param{
+            Limit: time.Duration(3)*time.Second, // optional
+            Retry: 2, // optional, default:1
+        }.
+        Form(&ReqParam{Directory: "request"}). // optional
+        Json(&Body{Directory: "request"}). // optional
+        Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}) // optional
+
+        request.Request(context.Background(), "GET", "https://github.com/neo532/gofr", p)
+    }
+```
+
 ## Validator
 
 It is a powerful-tool of verification,conversion and filter. So simply,good expansibility and good for using.
