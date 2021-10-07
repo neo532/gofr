@@ -19,8 +19,8 @@ import (
 	"github.com/neo532/gofr/lib/slices"
 )
 
-// Struct2ReqArgs turn the struct data to string data.
-func Struct2ReqArgs(param interface{}) (r string, err error) {
+// Struct2QueryArgs turn the struct data to string data.
+func Struct2QueryArgs(param interface{}) (r string, err error) {
 
 	// unify type
 	T := reflect.TypeOf(param)

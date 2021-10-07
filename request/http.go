@@ -96,7 +96,7 @@ func (p Param) JsonBody(param interface{}) Param {
 // QueryArgs deals with form data and returns Paramself by struct.
 func (p Param) QueryArgs(param interface{}) Param {
 	var str string
-	str, p.err = Struct2ReqArgs(param)
+	str, p.err = Struct2QueryArgs(param)
 	if p.err != nil {
 		return p
 	}
