@@ -43,25 +43,24 @@ It is a powerful-tool of request.It contains log/retry.
         "github.com/neo532/gofr/request"
     )
 
-	type ReqParam struct {
-		Directory string `form:"directory"`
-	}
-	type Body struct {
-		Directory string `json:"directory"`
-	}
+    type ReqParam struct {
+        Directory string `form:"directory"`
+    }
+    type Body struct {
+        Directory string `json:"directory"`
+    }
 
     func main() {
-
         // register logger if you like.
         // gofr/request/logger.go
 
         // request:
         var p = request.Param{
-            Limit: time.Duration(3)*time.Second, // optional
-            Retry: 2, // optional, default:1
+            Limit: time.Duration(3)*time.Second,	// optional
+            Retry: 2,					// optional, default:1
         }.
-        Form(&ReqParam{Directory: "request"}). // optional
-        Json(&Body{Directory: "request"}). // optional
+        Form(&ReqParam{Directory: "request"}).		// optional
+        Json(&Body{Directory: "request"}).		// optional
         Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}) // optional
 
         request.Request(context.Background(), "GET", "https://github.com/neo532/gofr", p)
