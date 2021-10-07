@@ -53,15 +53,15 @@ func Struct2QueryArgs(param interface{}) (r string, err error) {
 		switch objField.Kind() {
 		case reflect.String:
 			b.WriteString(url.QueryEscape(V.FieldByName(name).String()))
-		case reflect.Float64:
-			b.WriteString(strconv.FormatFloat(V.FieldByName(name).Float(), 'f', -1, 64))
 		case reflect.Int, reflect.Int64:
 			b.WriteString(strconv.FormatInt(V.FieldByName(name).Int(), 10))
 		case reflect.Uint64:
 			b.WriteString(strconv.FormatUint(V.FieldByName(name).Uint(), 10))
+		case reflect.Float64:
+			b.WriteString(strconv.FormatFloat(V.FieldByName(name).Float(), 'f', -1, 64))
 		default:
 			err = fmt.Errorf(
-				"%v isnot support type. string/float64/int64/int only",
+				"%v isn't support type. string/int/int64/uint64/float64 only",
 				objField.Kind(),
 			)
 			return
