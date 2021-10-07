@@ -13,8 +13,8 @@ package request
 		Directory string `json:"directory"`
 	}
 	var p = request.Param{Limit: time.Duration(3)*time.Second}.
-		Form(&ReqParam{Directory: "request"}).
-		Json(&Body{Directory: "request"}).
+		QueryArgs(&ReqParam{Directory: "request"}).
+		JsonBody(&Body{Directory: "request"}).
 		Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}})
 	request.Request(context.Background(), "GET", "https://github.com/neo532/gofr", p)
 */
@@ -32,7 +32,7 @@ import (
 
 // Param is Request's parameter.
 type Param struct {
-	getArgs string
+	queryArgs string
 
 	body     io.Reader
 	bodyCurl string
@@ -81,8 +81,8 @@ func (p Param) OriBody(param string) Param {
 	return p
 }
 
-// Json deals with json data and returns Paramself by struct.
-func (p Param) Json(param interface{}) Param {
+// JsonBody deals with json data and returns Paramself by struct.
+func (p Param) JsonBody(param interface{}) Param {
 	var bytesData []byte
 	bytesData, p.err = json.Marshal(param)
 	if p.err != nil {
@@ -93,14 +93,14 @@ func (p Param) Json(param interface{}) Param {
 	return p
 }
 
-// Form deals with form data and returns Paramself by struct.
-func (p Param) Form(param interface{}) Param {
+// QueryArgs deals with form data and returns Paramself by struct.
+func (p Param) QueryArgs(param interface{}) Param {
 	var str string
 	str, p.err = Struct2ReqArgs(param)
 	if p.err != nil {
 		return p
 	}
-	p.getArgs = "?" + str
+	p.queryArgs = "?" + str
 	return p
 }
 
@@ -151,7 +151,7 @@ func doHTTP(
 
 	// request init
 	var req *http.Request
-	var reqFull = url + param.getArgs
+	var reqFull = url + param.queryArgs
 	req, err = http.NewRequest(method, reqFull, param.body)
 	if err != nil {
 		return
