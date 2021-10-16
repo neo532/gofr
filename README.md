@@ -11,11 +11,12 @@ Gofr is a web framework written in Go (Golang).It aims to be a more easy framewo
 
 - [Gofr Web Framework](#gofr-web-framework)
     - [Installation](#installation)
-    - [HTTP request](#HTTP-request)
-    - [Distributed lock](#Distributed-lock)
-    - [Frequency controller](#Frequency-controller)
-    - [Page Execute](#Page-Execute)
-    - [Guard panic](#Guard-panic)
+    - [Usage](#Usage)
+        - [HTTP request](#HTTP-request)
+        - [Distributed lock](#Distributed-lock)
+        - [Frequency controller](#Frequency-controller)
+        - [Page Execute](#Page-Execute)
+        - [Guard panic](#Guard-panic)
 
 
 ## Installation
@@ -78,7 +79,7 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
 ```
 -->
 
-## HTTP-request
+### HTTP request
 
 It is a powerful-tool of request.It contains log/retry.
 
@@ -141,7 +142,7 @@ It is a powerful-tool of request.It contains log/retry.
     }
 ```
 
-## Distributed-lock
+### Distributed lock
 
 It is a distributed lock with signle instance by redis.
 
@@ -189,7 +190,7 @@ It is a distributed lock with signle instance by redis.
     }
 ```
 
-## Frequency-controller
+### Frequency controller
 
 It is a frequency with signle instance by redis.
 
@@ -240,7 +241,7 @@ It is a frequency with signle instance by redis.
     }
 ```
 
-## Page-Execute
+### Page Execute
 
 It is a tool to page slice.
 
@@ -264,4 +265,4 @@ It is a tool to page slice.
     }
 ```
 
-## Guard-panic
+### Guard panic
