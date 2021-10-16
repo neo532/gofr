@@ -30,6 +30,50 @@ To install Gofr package, you need to install Go and set your Go workspace first.
     import "github.com/neo532/gofr"
 ```
 
+<!--- Deprecated
+## Validator
+
+It is a powerful-tool of verification,conversion and filter. So simply,good expansibility and good for using.
+
+[click me to code](https://github.com/neo532/gofr/blob/master/inout/vcf.go)
+
+```go
+    package main
+
+    import (
+        "fmt"
+        
+        "github.com/neo532/gofr/inout"
+    )
+
+    func main() {
+        //You can input parameters with one struct,one map of string or one by one.
+        //The below is a method,inputting with one by one.
+        vcf := inout.NewVCF(map[string]inout.Ido{
+            "param_int1": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
+            "param_str1": inout.NewStr("def1").IsGte(2).IsLte(5).InStr("string1"),
+            "param_str2": inout.NewStr().RegExp(inout.Venum).InStr("str2"),
+            "param_str3": inout.NewStr("def3").IsInMap(map[string]string{"a": "aVal"}).InStr("a"),
+            "param_str4": inout.NewStr("def4").IsInArr("a", "b").InStr("a"),
+            "param_str5": inout.NewStr().Slash().InStr(`\`),
+            //...
+        }).Do()
+
+        if !vcf.IsOk() {
+            fmt.Println(vcf.Err()) // param_str1:Length is too long!
+            return
+        }
+
+        fmt.Println(vcf.Int64("param_int1"))  // 20
+        fmt.Println(vcf.String("param_str1")) // def1
+        fmt.Println(vcf.String("param_str2")) // str2
+        fmt.Println(vcf.String("param_str3")) // aVal
+        fmt.Println(vcf.String("param_str4")) // a
+        fmt.Println(vcf.String("param_str5")) // "\\"
+    }
+```
+-->
+
 ## HTTP request
 
 It is a powerful-tool of request.It contains log/retry.
@@ -77,50 +121,98 @@ It is a powerful-tool of request.It contains log/retry.
     }
 ```
 
-<!--- Deprecated
-## Validator
+## Distributed lock
 
-It is a powerful-tool of verification,conversion and filter. So simply,good expansibility and good for using.
+It is a distributed lock with signle instance by redis.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/inout/vcf.go)
+[click me to code](https://github.com/neo532/gofr/blob/master/tool)
 
 ```go
     package main
 
     import (
-        "fmt"
-        
-        "github.com/neo532/gofr/inout"
+        "github.com/go-redis/redis"
+        "github.com/neo532/gofr/tool"
     )
 
-    func main() {
-        //You can input parameters with one struct,one map of string or one by one.
-        //The below is a method,inputting with one by one.
-        vcf := inout.NewVCF(map[string]inout.Ido{
-            "param_int1": inout.NewInt().IsGte(10).IsLte(90).InInt64(20),
-            "param_str1": inout.NewStr("def1").IsGte(2).IsLte(5).InStr("string1"),
-            "param_str2": inout.NewStr().RegExp(inout.Venum).InStr("str2"),
-            "param_str3": inout.NewStr("def3").IsInMap(map[string]string{"a": "aVal"}).InStr("a"),
-            "param_str4": inout.NewStr("def4").IsInArr("a", "b").InStr("a"),
-            "param_str5": inout.NewStr().Slash().InStr(`\`),
-            //...
-        }).Do()
+	type lockDb struct {
+		cache *redis.Client
+	}
 
-        if !vcf.IsOk() {
-            fmt.Println(vcf.Err()) // param_str1:Length is too long!
-            return
+	func (l *lockDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+		return l.cache.Eval(cmd, keys, args...).Result()
+	}
+
+    var Lock *tool.Lock
+
+    func init(){
+        var rdb := &lockDb{
+            redis.NewClient(&redis.Options{
+                Addr:     "127.0.0.1:6379",
+                Password: "password",
+            })
         }
+        var Lock = tool.NewLock(rdb)
+    }
 
-        fmt.Println(vcf.Int64("param_int1"))  // 20
-        fmt.Println(vcf.String("param_str1")) // def1
-        fmt.Println(vcf.String("param_str2")) // str2
-        fmt.Println(vcf.String("param_str3")) // aVal
-        fmt.Println(vcf.String("param_str4")) // a
-        fmt.Println(vcf.String("param_str5")) // "\\"
+    func main() {
+        var c = context.Background()
+        var key = "IamAKey"
+        var expire = time.Duration(10) * time.Second
+        var wait = time.Duration(2) * time.Second
+
+        code, err := Lock.Lock(c, key, expire, wait)
+        Lock.UnLock(c, key, code)
     }
 ```
--->
 
-## Distributed lock
 ## Frequency controller
+
+It is a frequency with signle instance by redis.
+
+[click me to code](https://github.com/neo532/gofr/blob/master/tool)
+
+```go
+    package main
+
+    import (
+        "github.com/go-redis/redis"
+        "github.com/neo532/gofr/tool"
+    )
+
+	type freqDb struct {
+		cache *redis.Client
+	}
+
+	func (l *freqDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+		return l.cache.Eval(cmd, keys, args...).Result()
+	}
+
+    var Freq *tool.Freq
+
+    func init(){
+        var rdb := &freqDb{
+            redis.NewClient(&redis.Options{
+                Addr:     "127.0.0.1:6379",
+                Password: "password",
+            })
+        }
+        var Freq = tool.NewFreq(rdb)
+        Freq.Timezone("Local")
+    }
+
+    func main() {
+
+        var c = context.Background()
+        var preKey = "user.test"
+        var rule = []tool.FreqRule{
+            tool.FreqRule{Duri: "10000", Times: 80},
+            tool.FreqRule{Duri: "day", Times: 5},
+        }
+
+        fmt.Println(Freq.IncrCheck(c, preKey, rule...))
+        fmt.Println(Freq.Get(c, preKey, rule...))
+    }
+```
+
 ## Guard panic

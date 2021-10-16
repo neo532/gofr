@@ -78,14 +78,22 @@ type ILockDb interface {
 
 // Lock is the instance for Lock.
 type Lock struct {
-	db ILockDb
+	db       ILockDb
+	duration time.Duration
 }
 
 // NewLock returns the instance for Lock.
 func NewLock(d ILockDb) *Lock {
 	return &Lock{
-		db: d,
+		db:       d,
+		duration: time.Duration(50) * time.Millisecond,
 	}
+}
+
+// Duration sets the duration on lock.
+func (l *Lock) Duration(d time.Duration) *Lock {
+	l.duration = d
+	return l
 }
 
 // UnLock unlocks.
@@ -123,7 +131,7 @@ func (l *Lock) Lock(c context.Context, key string, expire, wait time.Duration) (
 		}
 		err = errors.New(e)
 
-		time.Sleep(time.Duration(50) * time.Millisecond)
+		time.Sleep(l.duration)
 	}
 
 	if err == nil {
