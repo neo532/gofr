@@ -64,7 +64,7 @@ It is a powerful-tool of request.It contains log/retry.
         QueryArgs(&ReqParam{Directory: "request"}). // optional
         JsonBody(&Body{Directory: "request"}).      // optional
         Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}). // optional
-		CheckArgs()
+        CheckArgs()
 
         // check arguments
         if p.Err() != nil {
