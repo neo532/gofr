@@ -10,8 +10,12 @@ Gofr is a web framework written in Go (Golang).It aims to be a more easy framewo
 ## Contents
 
 - [Gofr Web Framework](#gofr-web-framework)
-  - [Installation](#installation)
-  - [Validator](#validator)
+    - [Installation](#installation)
+    - [HTTP request](#HTTP request)
+    - [Distributed lock](#Distributed lock)
+    - [Frequency controller](#Frequency controller)
+    - [Page Execute](#Page Execute)
+    - [Guard panic](#Guard panic)
 
 
 ## Installation
