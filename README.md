@@ -54,16 +54,26 @@ It is a powerful-tool of request.It contains log/retry.
         // register logger if you like.
         // gofr/request/logger.go
 
-        // request:
-        var p = request.Param{
+        // build args
+        var p = request.HTTP{
+            Method: "GET",
+            URL: "https://github.com/neo532/gofr",
             Limit: time.Duration(3)*time.Second,    // optional
             Retry: 2,                               // optional, default:1
         }.
         QueryArgs(&ReqParam{Directory: "request"}). // optional
         JsonBody(&Body{Directory: "request"}).      // optional
-        Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}) // optional
+        Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}). // optional
+		CheckArgs()
 
-        request.Request(context.Background(), "GET", "https://github.com/neo532/gofr", p)
+        // check arguments
+        if p.Err() != nil {
+            fmt.Println(p.Err())
+            return
+        }
+
+        // request
+        p.Do(context.Background())
     }
 ```
 
