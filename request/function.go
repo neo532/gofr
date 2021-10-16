@@ -89,6 +89,9 @@ func fmtCurlOneHeader(key, value string) string {
 	return " -H '" + key + ":" + value + "'"
 }
 
-func fmtCurlBody(body string) string {
+func fmtCurlBody(body string) (str string) {
+	if body == "" {
+		return
+	}
 	return " -d " + "'" + strings.Trim(strconv.Quote(body), `"`) + "'"
 }

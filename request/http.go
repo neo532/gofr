@@ -6,22 +6,32 @@ package request
  * @mail neo532@126.com
  * @date 2021-10-02
  * @demo:
-	type ReqParam struct {
+	type Req struct {
 		Directory string `form:"directory"`
 	}
 	type Body struct {
 		Directory string `json:"directory"`
 	}
-	var p = request.Param{Limit: time.Duration(3)*time.Second}.
-		QueryArgs(&ReqParam{Directory: "request"}).
+	var p = request.HTTP{
+		Limit: time.Duration(3)*time.Second,
+		URL: "https://github.com/neo532/gofr",
+		Method: "GET",
+	}.
+		QueryArgs(&Req{Directory: "request"}).
 		JsonBody(&Body{Directory: "request"}).
-		Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}})
-	request.Request(context.Background(), "GET", "https://github.com/neo532/gofr", p)
+		Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}).
+		CheckArgs()
+	if p.Err() != nil {
+		fmt.Println(p.Err())
+		return
+	}
+	p.Do(context.Background())
 */
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,8 +40,8 @@ import (
 	"time"
 )
 
-// Param is Request's parameter.
-type Param struct {
+// HTTP is Request's HTTPeter.
+type HTTP struct {
 	queryArgs string
 
 	body     io.Reader
@@ -40,14 +50,48 @@ type Param struct {
 	headerReq  http.Header
 	headerCurl string
 
-	err error
+	err     error
+	curl    string
+	isCheck bool
 
-	Retry int
-	Limit time.Duration
+	URL    string
+	Method string
+	Limit  time.Duration
+	Retry  int
 }
 
-// Header returns Paramself by header.
-func (p Param) Header(header http.Header) Param {
+// QueryArgs deals with form data and returns HTTPself by struct.
+func (p HTTP) QueryArgs(param interface{}) HTTP {
+	var str string
+	str, p.err = Struct2QueryArgs(param)
+	if p.err != nil || str == "" {
+		return p
+	}
+	p.queryArgs = "?" + str
+	return p
+}
+
+// OriBody returns HTTPself by origin.
+func (p HTTP) OriBody(param string) HTTP {
+	p.bodyCurl = fmtCurlBody(param)
+	p.body = string2ioReader(param)
+	return p
+}
+
+// JsonBody deals with json data and returns HTTPself by struct.
+func (p HTTP) JsonBody(param interface{}) HTTP {
+	var bytesData []byte
+	bytesData, p.err = json.Marshal(param)
+	if p.err != nil {
+		return p
+	}
+	p.bodyCurl = fmtCurlBody(string(bytesData))
+	p.body = byte2ioReader(bytesData)
+	return p
+}
+
+// Header returns HTTPself by header.
+func (p HTTP) Header(header http.Header) HTTP {
 	p.headerReq = header
 
 	// log
@@ -61,73 +105,64 @@ func (p Param) Header(header http.Header) Param {
 	return p
 }
 
-// AddHeader can add one header to Param.
-func (p Param) AddHeader(key, value string) Param {
+// AddHeader can add one header to HTTP.
+func (p HTTP) AddHeader(key, value string) HTTP {
 	p.headerReq.Add(key, value)
 	p.headerCurl += fmtCurlOneHeader(key, value)
 	return p
 }
 
 // HeaderFollowLocation adds the header for the situation of 302 or 301.
-func (p Param) HeaderFollowLocation() Param {
+func (p HTTP) HeaderFollowLocation() HTTP {
 	p.AddHeader("CURLOPT_FOLLOWLOCATION", "TRUE")
 	return p
 }
 
-// OriBody returns Paramself by origin.
-func (p Param) OriBody(param string) Param {
-	p.bodyCurl = fmtCurlBody(param)
-	p.body = string2ioReader(param)
-	return p
-}
-
-// JsonBody deals with json data and returns Paramself by struct.
-func (p Param) JsonBody(param interface{}) Param {
-	var bytesData []byte
-	bytesData, p.err = json.Marshal(param)
+// CheckArgs judges that if the HTTP is right.
+func (p HTTP) CheckArgs() HTTP {
+	// check HTTP
 	if p.err != nil {
 		return p
 	}
-	p.bodyCurl = fmtCurlBody(string(bytesData))
-	p.body = byte2ioReader(bytesData)
-	return p
-}
 
-// QueryArgs deals with form data and returns Paramself by struct.
-func (p Param) QueryArgs(param interface{}) Param {
-	var str string
-	str, p.err = Struct2QueryArgs(param)
-	if p.err != nil {
-		return p
+	switch p.Retry {
+	case 0: // default, retry one times
+		p.Retry = 1
+	case -1: // no retry
+		p.Retry = 0
 	}
-	p.queryArgs = "?" + str
+	p.URL = p.URL + p.queryArgs
+	p.curl = fmt.Sprintf("curl -X '%s' '%s'%s%s",
+		p.Method,
+		p.URL,
+		p.headerCurl,
+		p.bodyCurl,
+	)
+	p.isCheck = true
+
+	// clean,in case of that the executing step isn't last one.
+	p.queryArgs = ""
+	p.bodyCurl = ""
+	p.headerCurl = ""
+
 	return p
 }
 
-// DoHTTP does a HTTP for multi-times.
-func DoHTTP(
-	c context.Context,
-	method string,
-	url string,
-	param Param,
-) (bResp []byte, err error) {
+// Err returns the error of HTTP.
+func (p HTTP) Err() error {
+	return p.err
+}
 
-	// check param
-	if param.err != nil {
-		err = param.err
+// Do does a HTTP for multi-times.
+func (p HTTP) Do(c context.Context) (bResp []byte, err error) {
+	if p.isCheck == false {
+		err = errors.New("Please check!")
 		return
 	}
 
 	var httpCode int
-	switch param.Retry {
-	case 0: // default, retry one times
-		param.Retry = 1
-	case -1: // no retry
-		param.Retry = 0
-	}
-
-	for i := 0; i <= param.Retry; i++ {
-		bResp, httpCode, err = doHTTP(c, method, url, param)
+	for i := 0; i <= p.Retry; i++ {
+		bResp, httpCode, err = p.do(c)
 		if httpCode == http.StatusOK {
 			break
 		}
@@ -135,33 +170,20 @@ func DoHTTP(
 	return
 }
 
-// http does with a http.
-func doHTTP(
-	c context.Context,
-	method string,
-	url string,
-	param Param,
-) (bResp []byte, statusCode int, err error) {
-
-	// check param
-	if param.err != nil {
-		err = param.err
-		return
-	}
-
+// do does with a http.
+func (p HTTP) do(c context.Context) (bResp []byte, statusCode int, err error) {
 	// request init
 	var req *http.Request
-	var reqFull = url + param.queryArgs
-	req, err = http.NewRequest(method, reqFull, param.body)
+	req, err = http.NewRequest(p.Method, p.URL, p.body)
 	if err != nil {
 		return
 	}
 
 	// header
-	req.Header = param.headerReq
+	req.Header = p.headerReq
 
 	// request
-	var client = &http.Client{Timeout: param.Limit}
+	var client = &http.Client{Timeout: p.Limit}
 	var resp *http.Response
 	var start = time.Now()
 	resp, err = client.Do(req)
@@ -177,12 +199,6 @@ func doHTTP(
 	}
 
 	// log
-	var curl = fmt.Sprintf("curl -X '%s' '%s'%s%s",
-		method,
-		reqFull,
-		param.headerCurl,
-		param.bodyCurl,
-	)
-	logger.Log(c, statusCode, curl, param.Limit, cost, bResp, err)
+	logger.Log(c, statusCode, p.curl, p.Limit, cost, bResp, err)
 	return
 }
