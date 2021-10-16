@@ -17,6 +17,7 @@ import (
 	"math"
 )
 
+// PageExec make slice execute in paging.
 func PageExec(total int, pageSize int, fn func(begin, end int)) {
 	if total == 0 || pageSize == 0 {
 		return
