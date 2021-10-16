@@ -6,29 +6,42 @@ package tool
  * @mail neo532@126.com
  * @date 2020-10-05
  * @demo:
+    package main
 
-	"github.com/go-redis/redis"
+    import (
+        "github.com/go-redis/redis"
+        "github.com/neo532/gofr/tool"
+    )
 
-	type lockDb struct {
-		cache *redis.Client
-	}
+    type RedisOne struct {
+        cache *redis.Client
+    }
 
-	func (l *lockDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
-		return l.cache.Eval(cmd, keys, args...).Result()
-	}
-	var c = context.Background()
-	rdb := &lockDb{redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "password",
-	})}
-	var l = tool.NewLock(rdb)
-	code, err := l.Lock(
-		c,
-		"key1",
-		time.Duration(1) * time.Second,
-		time.Duration(1) * time.Second,
-	)
-	l.UnLock(c, "key1", code)
+    func (l *RedisOne) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+        return l.cache.Eval(cmd, keys, args...).Result()
+    }
+
+    var Lock *tool.Lock
+
+    func init(){
+        var rdb := &RedisOne{
+            redis.NewClient(&redis.Options{
+                Addr:     "127.0.0.1:6379",
+                Password: "password",
+            })
+        }
+        var Lock = tool.NewLock(rdb)
+    }
+
+    func main() {
+        var c = context.Background()
+        var key = "IamAKey"
+        var expire = time.Duration(10) * time.Second
+        var wait = time.Duration(2) * time.Second
+
+        code, err := Lock.Lock(c, key, expire, wait)
+        Lock.UnLock(c, key, code)
+    }
 */
 
 import (

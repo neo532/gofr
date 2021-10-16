@@ -5,7 +5,48 @@ package tool
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-09-26
- */
+ * @demo:
+    package main
+
+    import (
+        "github.com/go-redis/redis"
+        "github.com/neo532/gofr/tool"
+    )
+
+    type RedisOne struct {
+        cache *redis.Client
+    }
+
+    func (l *RedisOne) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+        return l.cache.Eval(cmd, keys, args...).Result()
+    }
+
+    var Freq *tool.Freq
+
+    func init(){
+        var rdb := &RedisOne{
+            redis.NewClient(&redis.Options{
+                Addr:     "127.0.0.1:6379",
+                Password: "password",
+            })
+        }
+        var Freq = tool.NewFreq(rdb)
+        Freq.Timezone("Local")
+    }
+
+    func main() {
+
+        var c = context.Background()
+        var preKey = "user.test"
+        var rule = []tool.FreqRule{
+            tool.FreqRule{Duri: "10000", Times: 80},
+            tool.FreqRule{Duri: "day", Times: 5},
+        }
+
+        fmt.Println(Freq.IncrCheck(c, preKey, rule...))
+        fmt.Println(Freq.Get(c, preKey, rule...))
+    }
+*/
 
 import (
 	"context"

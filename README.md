@@ -216,3 +216,26 @@ It is a frequency with signle instance by redis.
 ```
 
 ## Guard panic
+
+## Page Execute
+
+It is a tool to page slice.
+
+[click me to code](https://github.com/neo532/gofr/blob/master/tool)
+
+```go
+    package main
+
+    import (
+        "github.com/neo532/gofr/tool"
+    )
+
+    func main() {
+
+        var arr = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+        tool.PageExec(len(arr), 3, func(b, e int) {
+            fmt.Println(arr[b:e])
+        })
+        // [1 2 3] [4 5 6] [7 8 9] [10]
+    }
+```
