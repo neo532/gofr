@@ -87,27 +87,43 @@ It is a powerful-tool of request.It contains log/retry.
         "github.com/neo532/gofr/request"
     )
 
+    type Logger struct {
+    }
+
+    func (l *Logger) Log(c context.Context, statusCode int, curl string, limit time.Duration, cost time.Duration, resp []byte, err error) {
+        var logMsg = fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [%+v]",
+                curl,
+                statusCode,
+                limit,
+                cost,
+                string(resp),
+                )
+            fmt.Println(logMsg)
+    }
+
     type ReqParam struct {
         Directory string `form:"directory"`
     }
+
     type Body struct {
         Directory string `json:"directory"`
     }
 
     func main() {
-        // register logger if you like.
-        // gofr/request/logger.go
+
+        // register logger if it's necessary.
+        request.RegLogger(&Logger{})
 
         // build args
         var p = request.HTTP{
             Method: "GET",
-            URL: "https://github.com/neo532/gofr",
-            Limit: time.Duration(3)*time.Second,    // optional
-            Retry: 2,                               // optional, default:1
+            URL:    "https://github.com/neo532/gofr",
+            Limit:  time.Duration(3) * time.Second, // optional
+            Retry:  1,                              // optional, default:1
         }.
-        QueryArgs(&ReqParam{Directory: "request"}). // optional
-        JsonBody(&Body{Directory: "request"}).      // optional
-        Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}). // optional
+        QueryArgs(&ReqParam{Directory: "request"}).                                // optional
+        JsonBody(&Body{Directory: "request"}).                                     // optional
+        Header(http.Header{"a": []string{"a1", "a2"}, "b": []string{"b1", "b2"}}). // optional
         CheckArgs()
 
         // check arguments
@@ -146,16 +162,19 @@ It is a distributed lock with signle instance by redis.
     var Lock *tool.Lock
 
     func init(){
+
         var rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
+
         var Lock = tool.NewLock(rdb)
     }
 
     func main() {
+
         var c = context.Background()
         var key = "IamAKey"
         var expire = time.Duration(10) * time.Second
@@ -191,12 +210,14 @@ It is a frequency with signle instance by redis.
     var Freq *tool.Freq
 
     func init(){
+
         var rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
+
         var Freq = tool.NewFreq(rdb)
         Freq.Timezone("Local")
     }
@@ -215,8 +236,6 @@ It is a frequency with signle instance by redis.
     }
 ```
 
-## Guard panic
-
 ## Page Execute
 
 It is a tool to page slice.
@@ -233,9 +252,12 @@ It is a tool to page slice.
     func main() {
 
         var arr = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+
         tool.PageExec(len(arr), 3, func(b, e int) {
             fmt.Println(arr[b:e])
         })
         // [1 2 3] [4 5 6] [7 8 9] [10]
     }
 ```
+
+## Guard panic
