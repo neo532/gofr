@@ -135,18 +135,18 @@ It is a distributed lock with signle instance by redis.
         "github.com/neo532/gofr/tool"
     )
 
-	type lockDb struct {
-		cache *redis.Client
-	}
+    type RedisOne struct {
+        cache *redis.Client
+    }
 
-	func (l *lockDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
-		return l.cache.Eval(cmd, keys, args...).Result()
-	}
+    func (l *RedisOne) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+        return l.cache.Eval(cmd, keys, args...).Result()
+    }
 
     var Lock *tool.Lock
 
     func init(){
-        var rdb := &lockDb{
+        var rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
@@ -180,18 +180,18 @@ It is a frequency with signle instance by redis.
         "github.com/neo532/gofr/tool"
     )
 
-	type freqDb struct {
-		cache *redis.Client
-	}
+    type RedisOne struct {
+        cache *redis.Client
+    }
 
-	func (l *freqDb) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
-		return l.cache.Eval(cmd, keys, args...).Result()
-	}
+    func (l *RedisOne) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
+        return l.cache.Eval(cmd, keys, args...).Result()
+    }
 
     var Freq *tool.Freq
 
     func init(){
-        var rdb := &freqDb{
+        var rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
