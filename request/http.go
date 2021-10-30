@@ -12,11 +12,11 @@ package request
 	type Body struct {
 		Directory string `json:"directory"`
 	}
-	var p = request.HTTP{
+	var p = (&request.HTTP{
 		Limit: time.Duration(3)*time.Second,
 		URL: "https://github.com/neo532/gofr",
 		Method: "GET",
-	}.
+	}).
 		QueryArgs(&Req{Directory: "request"}).
 		JsonBody(&Body{Directory: "request"}).
 		Header(http.Header{"a": []string{"a1", "a2"}, "b":[]string{"b1", "b2"}}).
@@ -58,10 +58,12 @@ type HTTP struct {
 	Method string
 	Limit  time.Duration
 	Retry  int
+
+	cookies []*http.Cookie
 }
 
 // QueryArgs deals with form data and returns HTTPself by struct.
-func (p HTTP) QueryArgs(param interface{}) HTTP {
+func (p *HTTP) QueryArgs(param interface{}) *HTTP {
 	var str string
 	str, p.err = Struct2QueryArgs(param)
 	if p.err != nil || str == "" {
@@ -72,14 +74,14 @@ func (p HTTP) QueryArgs(param interface{}) HTTP {
 }
 
 // OriBody returns HTTPself by origin.
-func (p HTTP) OriBody(param string) HTTP {
+func (p *HTTP) OriBody(param string) *HTTP {
 	p.bodyCurl = fmtCurlBody(param)
 	p.body = string2ioReader(param)
 	return p
 }
 
 // JsonBody deals with json data and returns HTTPself by struct.
-func (p HTTP) JsonBody(param interface{}) HTTP {
+func (p *HTTP) JsonBody(param interface{}) *HTTP {
 	var bytesData []byte
 	bytesData, p.err = json.Marshal(param)
 	if p.err != nil {
@@ -91,7 +93,7 @@ func (p HTTP) JsonBody(param interface{}) HTTP {
 }
 
 // Header returns HTTPself by header.
-func (p HTTP) Header(header http.Header) HTTP {
+func (p *HTTP) Header(header http.Header) *HTTP {
 	p.headerReq = header
 
 	// log
@@ -106,20 +108,20 @@ func (p HTTP) Header(header http.Header) HTTP {
 }
 
 // AddHeader can add one header to HTTP.
-func (p HTTP) AddHeader(key, value string) HTTP {
+func (p *HTTP) AddHeader(key, value string) *HTTP {
 	p.headerReq.Add(key, value)
 	p.headerCurl += fmtCurlOneHeader(key, value)
 	return p
 }
 
 // HeaderFollowLocation adds the header for the situation of 302 or 301.
-func (p HTTP) HeaderFollowLocation() HTTP {
+func (p *HTTP) HeaderFollowLocation() *HTTP {
 	p.AddHeader("CURLOPT_FOLLOWLOCATION", "TRUE")
 	return p
 }
 
 // CheckArgs judges that if the HTTP is right.
-func (p HTTP) CheckArgs() HTTP {
+func (p *HTTP) CheckArgs() *HTTP {
 	// check HTTP
 	if p.err != nil {
 		return p
@@ -148,13 +150,17 @@ func (p HTTP) CheckArgs() HTTP {
 	return p
 }
 
+func (p *HTTP) Cookies() []*http.Cookie {
+	return p.cookies
+}
+
 // Err returns the error of HTTP.
-func (p HTTP) Err() error {
+func (p *HTTP) Err() error {
 	return p.err
 }
 
 // Do does a HTTP for multi-times.
-func (p HTTP) Do(c context.Context) (bResp []byte, err error) {
+func (p *HTTP) Do(c context.Context) (bResp []byte, err error) {
 	if p.isCheck == false {
 		err = errors.New("Please check!")
 		return
@@ -171,7 +177,7 @@ func (p HTTP) Do(c context.Context) (bResp []byte, err error) {
 }
 
 // do does with a http.
-func (p HTTP) do(c context.Context) (bResp []byte, statusCode int, err error) {
+func (p *HTTP) do(c context.Context) (bResp []byte, statusCode int, err error) {
 	// request init
 	var req *http.Request
 	req, err = http.NewRequest(p.Method, p.URL, p.body)
@@ -190,12 +196,13 @@ func (p HTTP) do(c context.Context) (bResp []byte, statusCode int, err error) {
 	var cost = time.Now().Sub(start)
 
 	// response
-	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
-		statusCode = resp.StatusCode
-		if err == nil {
+	if resp != nil {
+		if resp.Body != nil {
+			defer resp.Body.Close()
 			bResp, err = ioutil.ReadAll(resp.Body)
 		}
+		p.cookies = resp.Cookies()
+		statusCode = resp.StatusCode
 	}
 
 	// log
