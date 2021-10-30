@@ -121,12 +121,12 @@ It is a powerful-tool of request.It contains log/retry.
         request.RegLogger(&Logger{})
 
         // build args
-        var p = request.HTTP{
+        var p = (&request.HTTP{
             Method: "GET",
             URL:    "https://github.com/neo532/gofr",
             Limit:  time.Duration(3) * time.Second, // optional
             Retry:  1,                              // optional, default:1
-        }.
+        }).
         QueryArgs(&ReqParam{Directory: "request"}).                                // optional
         JsonBody(&Body{Directory: "request"}).                                     // optional
         Header(http.Header{"a": []string{"a1", "a2"}, "b": []string{"b1", "b2"}}). // optional
