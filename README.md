@@ -96,14 +96,15 @@ It is a powerful-tool of request.It contains log/retry.
     }
 
     func (l *Logger) Log(c context.Context, statusCode int, curl string, limit time.Duration, cost time.Duration, resp []byte, err error) {
-        var logMsg = fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [%+v]",
-                curl,
-                statusCode,
-                limit,
-                cost,
-                string(resp),
-                )
-            fmt.Println(logMsg)
+        var logMsg = fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [err:%+v] [%+v]",
+            curl,
+            statusCode,
+            limit,
+            cost,
+            err,
+            string(resp),
+        )
+        fmt.Println(logMsg)
     }
 
     type ReqParam struct {
