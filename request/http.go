@@ -150,6 +150,7 @@ func (p *HTTP) CheckArgs() *HTTP {
 	return p
 }
 
+// Cookies returns cookies.
 func (p *HTTP) Cookies() []*http.Cookie {
 	return p.cookies
 }
