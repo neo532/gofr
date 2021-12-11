@@ -21,7 +21,7 @@ import (
 )
 
 // Struct2QueryArgs turn the struct data to string data.
-func Struct2QueryArgs(param interface{}) (r string, err error) {
+func Struct2QueryArgs(param interface{}) (s string, err error) {
 
 	// unify type
 	T := reflect.TypeOf(param)
@@ -39,21 +39,20 @@ func Struct2QueryArgs(param interface{}) (r string, err error) {
 	var b bytes.Buffer
 	for i := 0; i < T.NumField(); i++ {
 		var field = T.Field(i)
-		var name = field.Name
+		var value = V.Field(i)
 		var tag slices.String = strings.Split(field.Tag.Get("form"), ",")
-		var objField = V.Field(i)
 
 		// check if empty
-		if slices.In("omitempty", tag) && objField.IsZero() {
+		if slices.In("omitempty", tag) && value.IsZero() {
 			continue
 		}
 
 		// identify type
-		if b, err = reflectKind2Byte(b, tag, V.FieldByName(name), "=", nil); err != nil {
+		if b, err = reflectKind2Byte(b, tag, value, "=", nil); err != nil {
 			return
 		}
 	}
-	r = strings.TrimPrefix(b.String(), "&")
+	s = strings.TrimPrefix(b.String(), "&")
 	return
 }
 
@@ -81,7 +80,7 @@ func reflectKind2Byte(b bytes.Buffer, tag []string, value reflect.Value, equal s
 		}
 	default:
 		err = fmt.Errorf(
-			"%v isn't support type. string/int/int64/uint64/float64 only",
+			"%v isn't support type. string/int/int64/uint64/float64/[]string/[]int/[]int64/[]uint64/[]float64 only",
 			value.Kind(),
 		)
 		return b, err
