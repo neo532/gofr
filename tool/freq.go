@@ -24,21 +24,21 @@ package tool
     var Freq *tool.Freq
 
     func init(){
-        var rdb := &RedisOne{
+        rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
-        var Freq = tool.NewFreq(rdb)
+        Freq = tool.NewFreq(rdb)
         Freq.Timezone("Local")
     }
 
     func main() {
 
-        var c = context.Background()
-        var preKey = "user.test"
-        var rule = []tool.FreqRule{
+		c := context.Background()
+		preKey := "user.test"
+		rule := []tool.FreqRule{
             tool.FreqRule{Duri: "10000", Times: 80},
             tool.FreqRule{Duri: "day", Times: 5},
         }
@@ -165,14 +165,14 @@ func (f *Freq) IncrCheck(c context.Context, pre string, rule ...FreqRule) (bRst 
 }
 
 func (f *Freq) freq(pre string, ruleList []FreqRule, fn func(key string, expire, times int64) bool) bool {
-	var prekey = lib.StrJoin("freq:", pre, ":")
+	prekey := lib.StrJoin("freq:", pre, ":")
 	for _, r := range ruleList {
 		var key string
 		var expire int64
 		switch r.Duri {
 		case "today":
-			var now = time.Now()
-			var tomorrowFirst = time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, f.tz)
+			now := time.Now()
+			tomorrowFirst := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, f.tz)
 			key = prekey + now.Format("2006_01_02")
 			expire = int64(tomorrowFirst.Sub(now).Seconds())
 		default:

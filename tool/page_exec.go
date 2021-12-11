@@ -22,7 +22,7 @@ func PageExec(total int, pageSize int, fn func(begin, end int)) {
 	if total == 0 || pageSize == 0 {
 		return
 	}
-	var pageNum = int(math.Ceil(float64(total) / float64(pageSize)))
+	pageNum := int(math.Ceil(float64(total) / float64(pageSize)))
 	var b, e, i int
 	for i = 0; i < pageNum; i++ {
 

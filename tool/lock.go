@@ -24,20 +24,20 @@ package tool
     var Lock *tool.Lock
 
     func init(){
-        var rdb := &RedisOne{
+        rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
-        var Lock = tool.NewLock(rdb)
+        Lock = tool.NewLock(rdb)
     }
 
     func main() {
-        var c = context.Background()
-        var key = "IamAKey"
-        var expire = time.Duration(10) * time.Second
-        var wait = time.Duration(2) * time.Second
+		c := context.Background()
+		key := "IamAKey"
+		expire := time.Duration(10) * time.Second
+		wait := time.Duration(2) * time.Second
 
         code, err := Lock.Lock(c, key, expire, wait)
         Lock.UnLock(c, key, code)

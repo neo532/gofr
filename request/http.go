@@ -12,7 +12,7 @@ package request
 	type Body struct {
 		Directory string `json:"directory"`
 	}
-	var p = (&request.HTTP{
+	p := (&request.HTTP{
 		Limit: time.Duration(3)*time.Second,
 		URL: "https://github.com/neo532/gofr",
 		Method: "GET",
@@ -198,11 +198,11 @@ func (p *HTTP) do(c context.Context) (bResp []byte, statusCode int, err error) {
 	req.Header = p.headerReq
 
 	// request
-	var client = &http.Client{Timeout: p.Limit}
 	var resp *http.Response
-	var start = time.Now()
+	client := &http.Client{Timeout: p.Limit}
+	start := time.Now()
 	resp, err = client.Do(req)
-	var cost = time.Now().Sub(start)
+	cost := time.Now().Sub(start)
 
 	// response
 	if resp != nil {

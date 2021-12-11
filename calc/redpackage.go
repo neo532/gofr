@@ -24,8 +24,8 @@ func RedPkgList(maxMoney float64, maxCount int) []float64 {
 	bMaxCount := big.NewFloat(float64(maxCount))
 	bMaxMoney := big.NewFloat(maxMoney)
 
-	var n10 = math.Pow10(2)
-	var list = make([]float64, 0, maxCount)
+	n10 := math.Pow10(2)
+	list := make([]float64, 0, maxCount)
 
 	for i := 0; i < maxCount; i++ {
 		//remain := maxMoney - doneMoney - (maxCount-i+1)*minMoney

@@ -36,8 +36,8 @@ func Str2numByDict(str string, dict string) int64 {
 	lenD := len(dict)
 	lenS := len(str)
 
-	var rst = big.NewInt(0)
-	var j = big.NewInt(1)
+	rst := big.NewInt(0)
+	j := big.NewInt(1)
 	var pos int
 	for i := 0; i < lenS; i++ {
 		pos = strings.Index(dict, string(str[i]))

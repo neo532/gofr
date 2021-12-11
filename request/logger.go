@@ -34,7 +34,7 @@ type LoggerDefault struct {
 
 // Log is a default value to logger for showing.
 func (l *LoggerDefault) Log(c context.Context, statusCode int, curl string, limit time.Duration, cost time.Duration, resp []byte, err error) {
-	var logMsg = fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [err:%+v] [%+v]",
+	logMsg := fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [err:%+v] [%+v]",
 		curl,
 		statusCode,
 		limit,

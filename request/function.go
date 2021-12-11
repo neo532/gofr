@@ -38,8 +38,8 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 
 	var b bytes.Buffer
 	for i := 0; i < T.NumField(); i++ {
-		var field = T.Field(i)
-		var value = V.Field(i)
+		field := T.Field(i)
+		value := V.Field(i)
 		var tag slices.String = strings.Split(field.Tag.Get("form"), ",")
 
 		// check if empty

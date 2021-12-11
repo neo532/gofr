@@ -13,15 +13,15 @@ import (
 
 // Add returns the sum by two int64.
 func Add(left, right int64) int64 {
-	var l = big.NewInt(left)
-	var r = big.NewInt(right)
+	l := big.NewInt(left)
+	r := big.NewInt(right)
 	return l.Add(l, r).Int64()
 }
 
 // AddF returns the sum by two float64.
 func AddF(left, right float64) float64 {
-	var l = big.NewFloat(left)
-	var r = big.NewFloat(right)
+	l := big.NewFloat(left)
+	r := big.NewFloat(right)
 	rst, _ := l.Add(l, r).Float64()
 	return rst
 }

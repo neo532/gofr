@@ -29,8 +29,8 @@ type ISlice interface {
 func Unique(ori ISlice) ISlice {
 	var isUniq bool
 	var lenRst int
-	var lenOri = ori.Len()
-	var rst = ori.Make()
+	lenOri := ori.Len()
+	rst := ori.Make()
 	for i := 0; i < lenOri; i++ {
 		lenRst = rst.Len()
 		isUniq = true
@@ -50,8 +50,8 @@ func Unique(ori ISlice) ISlice {
 // Minus handles ISlice.
 func Minus(m, s ISlice) (rst ISlice) {
 	var isHas bool
-	var lenM = m.Len()
-	var lenS = s.Len()
+	lenM := m.Len()
+	lenS := s.Len()
 	rst = m.Make()
 	for i := 0; i < lenM; i++ {
 		isHas = false
@@ -70,8 +70,8 @@ func Minus(m, s ISlice) (rst ISlice) {
 
 // Intersect handles ISlice.
 func Intersect(o, t ISlice) (rst ISlice) {
-	var lenO = o.Len()
-	var lenT = t.Len()
+	lenO := o.Len()
+	lenT := t.Len()
 	rst = o.Make()
 	if lenO == 0 || lenT == 0 {
 		return
@@ -89,7 +89,7 @@ func Intersect(o, t ISlice) (rst ISlice) {
 
 // In handles ISlice.
 func In(needle interface{}, haystack ISlice) bool {
-	var l = haystack.Len()
+	l := haystack.Len()
 	if l == 0 || haystack.IsRighType(needle) == false {
 		return false
 	}
@@ -103,11 +103,11 @@ func In(needle interface{}, haystack ISlice) bool {
 
 // InSort handles ISlice.
 func InSort(needle interface{}, haystack ISlice) bool {
-	var l = haystack.Len()
+	l := haystack.Len()
 	if l == 0 || haystack.IsRighType(needle) == false {
 		return false
 	}
-	var index = sort.Search(l, func(i int) bool {
+	index := sort.Search(l, func(i int) bool {
 		return haystack.LessValue(i, needle)
 	})
 	if index < l && haystack.Value(index) == needle {

@@ -96,7 +96,7 @@ It is a powerful-tool of request.It contains log/retry.
     }
 
     func (l *Logger) Log(c context.Context, statusCode int, curl string, limit time.Duration, cost time.Duration, resp []byte, err error) {
-        var logMsg = fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [err:%+v] [%+v]",
+        logMsg := fmt.Sprintf("[%s] [code:%+v] [limit:%+v] [cost:%+v] [err:%+v] [%+v]",
             curl,
             statusCode,
             limit,
@@ -121,7 +121,7 @@ It is a powerful-tool of request.It contains log/retry.
         request.RegLogger(&Logger{})
 
         // build args
-        var p = (&request.HTTP{
+        p := (&request.HTTP{
             Method: "GET",
             URL:    "https://github.com/neo532/gofr",
             Limit:  time.Duration(3) * time.Second, // optional
@@ -169,22 +169,22 @@ It is a distributed lock with signle instance by redis.
 
     func init(){
 
-        var rdb := &RedisOne{
+        rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
 
-        var Lock = tool.NewLock(rdb)
+        Lock := tool.NewLock(rdb)
     }
 
     func main() {
 
-        var c = context.Background()
-        var key = "IamAKey"
-        var expire = time.Duration(10) * time.Second
-        var wait = time.Duration(2) * time.Second
+        c := context.Background()
+        key := "IamAKey"
+        expire := time.Duration(10) * time.Second
+        wait := time.Duration(2) * time.Second
 
         code, err := Lock.Lock(c, key, expire, wait)
         Lock.UnLock(c, key, code)
@@ -217,22 +217,22 @@ It is a frequency with signle instance by redis.
 
     func init(){
 
-        var rdb := &RedisOne{
+        rdb := &RedisOne{
             redis.NewClient(&redis.Options{
                 Addr:     "127.0.0.1:6379",
                 Password: "password",
             })
         }
 
-        var Freq = tool.NewFreq(rdb)
+        Freq := tool.NewFreq(rdb)
         Freq.Timezone("Local")
     }
 
     func main() {
 
-        var c = context.Background()
-        var preKey = "user.test"
-        var rule = []tool.FreqRule{
+        c := context.Background()
+        preKey := "user.test"
+        rule := []tool.FreqRule{
             tool.FreqRule{Duri: "10000", Times: 80},
             tool.FreqRule{Duri: "today", Times: 5},
         }
@@ -257,7 +257,7 @@ It is a tool to page slice.
 
     func main() {
 
-        var arr = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+        arr := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
         tool.PageExec(len(arr), 3, func(b, e int) {
             fmt.Println(arr[b:e])
