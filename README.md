@@ -83,13 +83,13 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
 
 It is a powerful-tool of request.It contains log/retry.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/request)
+[click me to code](https://github.com/neo532/gofr/blob/master/ghttp)
 
 ```go
     package main
 
     import (
-        "github.com/neo532/gofr/request"
+        "github.com/neo532/gofr/ghttp"
     )
 
     type Logger struct {
@@ -118,10 +118,10 @@ It is a powerful-tool of request.It contains log/retry.
     func main() {
 
         // register logger if it's necessary.
-        request.RegLogger(&Logger{})
+        ghttp.RegLogger(&Logger{})
 
         // build args
-        p := (&request.HTTP{
+        p := (&ghttp.HTTP{
             Method: "GET",
             URL:    "https://github.com/neo532/gofr",
             Limit:  time.Duration(3) * time.Second, // optional
@@ -139,7 +139,7 @@ It is a powerful-tool of request.It contains log/retry.
         }
 
         // request
-        p.Do(context.Background())
+        p.Request(context.Background())
     }
 ```
 
@@ -147,7 +147,7 @@ It is a powerful-tool of request.It contains log/retry.
 
 It is a distributed lock with signle instance by redis.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool)
+[click me to code](https://github.com/neo532/gofr/blob/master/tool/lock.go)
 
 ```go
     package main
@@ -195,7 +195,7 @@ It is a distributed lock with signle instance by redis.
 
 It is a frequency with signle instance by redis.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool)
+[click me to code](https://github.com/neo532/gofr/blob/master/tool/freq.go)
 
 ```go
     package main
@@ -246,7 +246,7 @@ It is a frequency with signle instance by redis.
 
 It is a tool to page slice.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool)
+[click me to code](https://github.com/neo532/gofr/blob/master/tool/page_exec.go)
 
 ```go
     package main

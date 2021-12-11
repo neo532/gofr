@@ -1,4 +1,4 @@
-package request
+package ghttp
 
 /*
  * @abstract http request
@@ -12,7 +12,7 @@ package request
 	type Body struct {
 		Directory string `json:"directory"`
 	}
-	p := (&request.HTTP{
+	p := (&ghttp.HTTP{
 		Limit: time.Duration(3)*time.Second,
 		URL: "https://github.com/neo532/gofr",
 		Method: "GET",
@@ -25,7 +25,7 @@ package request
 		fmt.Println(p.Err())
 		return
 	}
-	p.Do(context.Background())
+	p.Request(context.Background())
 */
 
 import (
@@ -168,8 +168,8 @@ func (p *HTTP) Err() error {
 	return p.err
 }
 
-// Do does a HTTP for multi-times.
-func (p *HTTP) Do(c context.Context) (bResp []byte, err error) {
+// Request does a HTTP for multi-times.
+func (p *HTTP) Request(c context.Context) (bResp []byte, err error) {
 	if p.isCheck == false {
 		err = errors.New("Please check!")
 		return

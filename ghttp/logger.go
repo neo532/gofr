@@ -1,7 +1,7 @@
-package request
+package ghttp
 
 /*
- * @abstract logger for request
+ * @abstract logger for http's request
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2021-10-06
