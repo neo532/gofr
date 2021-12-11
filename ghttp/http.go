@@ -29,6 +29,7 @@ package ghttp
 */
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -36,6 +37,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -79,8 +81,10 @@ func (p *HTTP) QueryArgs(param interface{}) *HTTP {
 
 // OriBody returns HTTPself by origin.
 func (p *HTTP) OriBody(param string) *HTTP {
-	p.bodyCurl = fmtCurlBody(param)
-	p.body = string2ioReader(param)
+	if param != "" {
+		p.bodyCurl = " -d " + "'" + strings.Trim(strconv.Quote(param), `"`) + "'"
+	}
+	p.body = strings.NewReader(param)
 	return p
 }
 
@@ -95,8 +99,10 @@ func (p *HTTP) JsonBody(param interface{}) *HTTP {
 	if p.err != nil {
 		return p
 	}
-	p.bodyCurl = fmtCurlBody(string(bytesData))
-	p.body = byte2ioReader(bytesData)
+	if param != "" {
+		p.bodyCurl = " -d " + "'" + strings.Trim(strconv.Quote(string(bytesData)), `"`) + "'"
+	}
+	p.body = bytes.NewReader(bytesData)
 	return p
 }
 
@@ -108,7 +114,7 @@ func (p *HTTP) Header(header http.Header) *HTTP {
 	var bHeader strings.Builder
 	for key, vs := range header {
 		for _, value := range vs {
-			bHeader.WriteString(fmtCurlOneHeader(key, value))
+			bHeader.WriteString(" -H '" + key + ":" + value + "'")
 		}
 	}
 	p.headerCurl = bHeader.String()
@@ -118,7 +124,7 @@ func (p *HTTP) Header(header http.Header) *HTTP {
 // AddHeader can add one header to HTTP.
 func (p *HTTP) AddHeader(key, value string) *HTTP {
 	p.headerReq.Add(key, value)
-	p.headerCurl += fmtCurlOneHeader(key, value)
+	p.headerCurl += " -H '" + key + ":" + value + "'"
 	return p
 }
 
