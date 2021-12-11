@@ -39,7 +39,7 @@ func Ucfirst(str string) string {
 func StrJoin(args ...string) string {
 	var b bytes.Buffer
 	for _, str := range args {
-		b.Write([]byte(str))
+		b.WriteString(str)
 	}
 	return b.String()
 }
@@ -47,7 +47,7 @@ func StrJoin(args ...string) string {
 // StrBJoin joins strings by a builder and the array of string.
 func StrBJoin(b bytes.Buffer, args ...string) bytes.Buffer {
 	for _, str := range args {
-		b.Write([]byte(str))
+		b.WriteString(str)
 	}
 	return b
 }
