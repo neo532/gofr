@@ -108,7 +108,7 @@ It is a powerful-tool of request.It contains log/retry.
     }
 
     type ReqParam struct {
-        Directory string `form:"directory"`
+        Directory string `form:"directory,omitempty"`
     }
 
     type Body struct {
@@ -234,7 +234,7 @@ It is a frequency with signle instance by redis.
         var preKey = "user.test"
         var rule = []tool.FreqRule{
             tool.FreqRule{Duri: "10000", Times: 80},
-            tool.FreqRule{Duri: "day", Times: 5},
+            tool.FreqRule{Duri: "today", Times: 5},
         }
 
         fmt.Println(Freq.IncrCheck(c, preKey, rule...))

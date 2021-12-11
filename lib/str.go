@@ -8,6 +8,7 @@ package lib
  */
 
 import (
+	"bytes"
 	"math"
 	"strconv"
 	"strings"
@@ -36,18 +37,19 @@ func Ucfirst(str string) string {
 
 // StrJoin joins strings by the array of string.
 func StrJoin(args ...string) string {
-	var b strings.Builder
+	var b bytes.Buffer
 	for _, str := range args {
-		b.WriteString(str)
+		b.Write([]byte(str))
 	}
 	return b.String()
 }
 
 // StrBJoin joins strings by a builder and the array of string.
-func StrBJoin(b *strings.Builder, args ...string) {
+func StrBJoin(b bytes.Buffer, args ...string) bytes.Buffer {
 	for _, str := range args {
-		b.WriteString(str)
+		b.Write([]byte(str))
 	}
+	return b
 }
 
 // Float2str returns the string after converting the float64 to string.

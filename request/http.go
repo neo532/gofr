@@ -64,6 +64,10 @@ type HTTP struct {
 
 // QueryArgs deals with form data and returns HTTPself by struct.
 func (p *HTTP) QueryArgs(param interface{}) *HTTP {
+	if p.err != nil {
+		return p
+	}
+
 	var str string
 	str, p.err = Struct2QueryArgs(param)
 	if p.err != nil || str == "" {
@@ -82,6 +86,10 @@ func (p *HTTP) OriBody(param string) *HTTP {
 
 // JsonBody deals with json data and returns HTTPself by struct.
 func (p *HTTP) JsonBody(param interface{}) *HTTP {
+	if p.err != nil {
+		return p
+	}
+
 	var bytesData []byte
 	bytesData, p.err = json.Marshal(param)
 	if p.err != nil {

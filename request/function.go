@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/neo532/gofr/lib"
 	"github.com/neo532/gofr/lib/slices"
 )
 
@@ -35,7 +36,7 @@ func Struct2QueryArgs(param interface{}) (r string, err error) {
 		return
 	}
 
-	var b strings.Builder
+	var b bytes.Buffer
 	for i := 0; i < T.NumField(); i++ {
 		var field = T.Field(i)
 		var name = field.Name
@@ -47,28 +48,45 @@ func Struct2QueryArgs(param interface{}) (r string, err error) {
 			continue
 		}
 
-		b.WriteString("&")
-		b.WriteString(tag[0])
-		b.WriteString("=")
-		switch objField.Kind() {
-		case reflect.String:
-			b.WriteString(url.QueryEscape(V.FieldByName(name).String()))
-		case reflect.Int, reflect.Int64:
-			b.WriteString(strconv.FormatInt(V.FieldByName(name).Int(), 10))
-		case reflect.Uint64:
-			b.WriteString(strconv.FormatUint(V.FieldByName(name).Uint(), 10))
-		case reflect.Float64:
-			b.WriteString(strconv.FormatFloat(V.FieldByName(name).Float(), 'f', -1, 64))
-		default:
-			err = fmt.Errorf(
-				"%v isn't support type. string/int/int64/uint64/float64 only",
-				objField.Kind(),
-			)
+		// identify type
+		if b, err = reflectKind2Byte(b, tag, V.FieldByName(name), "=", nil); err != nil {
 			return
 		}
 	}
 	r = strings.TrimPrefix(b.String(), "&")
 	return
+}
+
+// reflectKind2Byte turns the condition to bytes by reflect.
+func reflectKind2Byte(b bytes.Buffer, tag []string, value reflect.Value, equal string, err error) (bytes.Buffer, error) {
+	if err != nil {
+		return b, err
+	}
+	switch value.Kind() {
+	case reflect.String:
+		b = lib.StrBJoin(b, "&", tag[0], equal, url.QueryEscape(value.String()))
+	case reflect.Int, reflect.Int64:
+		b = lib.StrBJoin(b, "&", tag[0], equal, strconv.FormatInt(value.Int(), 10))
+	case reflect.Uint64:
+		b = lib.StrBJoin(b, "&", tag[0], equal, strconv.FormatUint(value.Uint(), 10))
+	case reflect.Float64:
+		b = lib.StrBJoin(b, "&", tag[0], equal, strconv.FormatFloat(value.Float(), 'f', -1, 64))
+	case reflect.Slice:
+		o := value
+		lenS := o.Len()
+		if lenS > 0 {
+			for i := 0; i < lenS; i++ {
+				b, err = reflectKind2Byte(b, tag, o.Index(i), "[]=", err)
+			}
+		}
+	default:
+		err = fmt.Errorf(
+			"%v isn't support type. string/int/int64/uint64/float64 only",
+			value.Kind(),
+		)
+		return b, err
+	}
+	return b, nil
 }
 
 // string2ioReader turns the string data to io.Reader.
