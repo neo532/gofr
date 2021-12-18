@@ -17,6 +17,12 @@ import (
 	"github.com/neo532/gofr/lib"
 )
 
+const (
+	FORM_AND          = "&"
+	FORM_ASSIGN       = "="
+	FORM_ASSIGN_SLICE = "[]="
+)
+
 // Struct2QueryArgs turn the struct data to string data.
 func Struct2QueryArgs(param interface{}) (s string, err error) {
 
@@ -39,9 +45,13 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 		value := V.Field(i)
 
 		name := field.Tag.Get("form")
-		emptyIndex := strings.Index(name, ",omitempty")
+		// don't parse that the name is -.
+		if name == "-" {
+			continue
+		}
 
-		// check if empty,in case of escape to heap,use strings.
+		// check whether if empty,in case of escape to heap,use strings.
+		emptyIndex := strings.Index(name, ",omitempty")
 		if emptyIndex != -1 {
 			if value.IsZero() {
 				continue
@@ -52,26 +62,30 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 		// identify type
 		switch value.Kind() {
 		case reflect.String:
-			b = lib.StrBJoin(b, "&", name, "=", url.QueryEscape(value.String()))
+			b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN, url.QueryEscape(value.String()))
 		case reflect.Int, reflect.Int64:
-			b = lib.StrBJoin(b, "&", name, "=", strconv.FormatInt(value.Int(), 10))
+			b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN, strconv.FormatInt(value.Int(), 10))
 		case reflect.Uint64:
-			b = lib.StrBJoin(b, "&", name, "=", strconv.FormatUint(value.Uint(), 10))
+			b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN, strconv.FormatUint(value.Uint(), 10))
 		case reflect.Float64:
-			b = lib.StrBJoin(b, "&", name, "=", strconv.FormatFloat(value.Float(), 'f', -1, 64))
-		case reflect.Slice:
+			b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN, strconv.FormatFloat(value.Float(), 'f', -1, 64))
+		case reflect.Bool:
+			b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN, strconv.FormatBool(value.Bool()))
+		case reflect.Slice, reflect.Array:
 			o := value
 			for i, lenS := 0, o.Len(); i < lenS; i++ {
 				v := o.Index(i)
 				switch v.Kind() {
 				case reflect.String:
-					b = lib.StrBJoin(b, "&", name, "[]=", url.QueryEscape(v.String()))
+					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, url.QueryEscape(v.String()))
 				case reflect.Int, reflect.Int64:
-					b = lib.StrBJoin(b, "&", name, "[]=", strconv.FormatInt(v.Int(), 10))
+					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatInt(v.Int(), 10))
 				case reflect.Uint64:
-					b = lib.StrBJoin(b, "&", name, "[]=", strconv.FormatUint(v.Uint(), 10))
+					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatUint(v.Uint(), 10))
 				case reflect.Float64:
-					b = lib.StrBJoin(b, "&", name, "[]=", strconv.FormatFloat(v.Float(), 'f', -1, 64))
+					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatFloat(v.Float(), 'f', -1, 64))
+				case reflect.Bool:
+					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatBool(v.Bool()))
 				default:
 					err = E_NOT_SUPPORT_TYPE
 					return

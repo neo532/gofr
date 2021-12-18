@@ -40,7 +40,7 @@ package tool
 		preKey := "user.test"
 		rule := []tool.FreqRule{
             tool.FreqRule{Duri: "10000", Times: 80},
-            tool.FreqRule{Duri: "day", Times: 5},
+            tool.FreqRule{Duri: "today", Times: 5},
         }
 
         fmt.Println(Freq.IncrCheck(c, preKey, rule...))
