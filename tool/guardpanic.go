@@ -5,12 +5,11 @@ package tool
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-06
- * @demo:
  */
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"runtime/debug"
 )
 
@@ -18,7 +17,8 @@ import (
 type guardpanic struct {
 	restartTimes  int
 	workerFn      func()
-	errCallBackFn func(err error)
+	errCallBackFn func(c context.Context, err error)
+	ctx           context.Context
 }
 
 // Recover is a method for panic.
@@ -26,23 +26,21 @@ func (gp *guardpanic) Recover() {
 
 	if r := recover(); r != nil {
 
-		if gp.errCallBackFn == nil {
-			gp.errCallBackFn = func(err error) {
-				fmt.Fprint(os.Stderr, err)
-			}
+		if gp.errCallBackFn != nil {
+			gp.errCallBackFn(
+				gp.ctx,
+				fmt.Errorf("%s, %s",
+					r,
+					string(debug.Stack()),
+				),
+			)
 		}
-
-		gp.errCallBackFn(
-			fmt.Errorf("%s, %s",
-				r,
-				string(debug.Stack()),
-			),
-		)
 
 		if gp.restartTimes > 0 {
 
 			gp.restartTimes--
 			go Run(
+				gp.ctx,
 				gp.workerFn,
 				gp.restartTimes,
 				gp.errCallBackFn,
@@ -52,15 +50,16 @@ func (gp *guardpanic) Recover() {
 }
 
 // Run is a function for goroutine.
-func Run(worker func(), times int, cb func(err error)) {
+func Run(c context.Context, worker func(), times int, cb func(c context.Context, err error)) {
 
 	gp := &guardpanic{
 		workerFn:      worker,
 		restartTimes:  times,
 		errCallBackFn: cb,
+		ctx:           c,
 	}
 	defer gp.Recover()
 
-	worker()
+	go worker()
 	return
 }

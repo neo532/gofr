@@ -5,44 +5,8 @@ package tool
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-05
- * @demo:
-    package main
-
-    import (
-        "github.com/go-redis/redis"
-        "github.com/neo532/gofr/tool"
-    )
-
-    type RedisOne struct {
-        cache *redis.Client
-    }
-
-    func (l *RedisOne) Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error) {
-        return l.cache.Eval(cmd, keys, args...).Result()
-    }
-
-    var Lock *tool.Lock
-
-    func init(){
-        rdb := &RedisOne{
-            redis.NewClient(&redis.Options{
-                Addr:     "127.0.0.1:6379",
-                Password: "password",
-            })
-        }
-        Lock = tool.NewLock(rdb)
-    }
-
-    func main() {
-		c := context.Background()
-		key := "IamAKey"
-		expire := time.Duration(10) * time.Second
-		wait := time.Duration(2) * time.Second
-
-        code, err := Lock.Lock(c, key, expire, wait)
-        Lock.UnLock(c, key, code)
-    }
-*/
+ * @example: github.com/neo532/gofr/blob/main/example/tool/lock_distributed_test.go
+ */
 
 import (
 	"context"
@@ -84,33 +48,44 @@ end
 return '` + evalOk + `'
 `
 
-// ILockDb is the interface for Lock's db.
-type ILockDb interface {
+// IDistributedLockDb is the interface for DistributedLock's db.
+type IDistributedLockDb interface {
 	Eval(c context.Context, cmd string, keys []string, args []interface{}) (rst interface{}, err error)
 }
 
-// Lock is the instance for Lock.
-type Lock struct {
-	db       ILockDb
+// DistributedLock is the instance for DistributedLock.
+type DistributedLock struct {
+	db       IDistributedLockDb
 	duration time.Duration
+	genCode  func() (s string, err error)
 }
 
-// NewLock returns the instance for Lock.
-func NewLock(d ILockDb) *Lock {
-	return &Lock{
+// NewDistributedLock returns the instance for Lock.
+func NewDistributedLock(d IDistributedLockDb) *DistributedLock {
+	return &DistributedLock{
 		db:       d,
 		duration: time.Duration(50) * time.Millisecond,
+		genCode: func() (s string, err error) {
+			s = uuid.NewV4().String()
+			return
+		},
 	}
 }
 
+// GenCodeFun returns a unique code.
+func (l *DistributedLock) GenUniqCodeFn(fn func() (s string, err error)) *DistributedLock {
+	l.genCode = fn
+	return l
+}
+
 // Duration sets the duration on lock.
-func (l *Lock) Duration(d time.Duration) *Lock {
+func (l *DistributedLock) Duration(d time.Duration) *DistributedLock {
 	l.duration = d
 	return l
 }
 
 // UnLock unlocks.
-func (l *Lock) UnLock(c context.Context, key string, code string) (err error) {
+func (l *DistributedLock) UnLock(c context.Context, key string, code string) (err error) {
 	key = getLockKey(key)
 	var rst interface{}
 	if rst, err = l.db.Eval(c, unlockLuaScript, []string{key}, []interface{}{code}); err != nil {
@@ -126,8 +101,11 @@ func (l *Lock) UnLock(c context.Context, key string, code string) (err error) {
 }
 
 // Lock locks and returns the result if locking is successfully.
-func (l *Lock) Lock(c context.Context, key string, expire, wait time.Duration) (code string, err error) {
-	code = uuid.NewV4().String()
+func (l *DistributedLock) Lock(c context.Context, key string, expire, wait time.Duration) (code string, err error) {
+	code, err = l.genCode()
+	if err != nil {
+		return
+	}
 	key = getLockKey(key)
 
 	endTs := time.Now().Add(wait)

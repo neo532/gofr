@@ -35,6 +35,23 @@ To install Gofr package, you need to install Go and set your Go workspace first.
     import "github.com/neo532/gofr"
 ```
 
+### Page Execute
+
+It makes getting remote data like getting variable.
+
+[example](https://github.com/neo532/gofr/blob/master/example/tool/variable_storage_test.go)
+
+```go
+    func main() {
+        c := context.Background()
+        d := user.Get(c)
+        fmt.Println(fmt.Sprintf("%s\t:get,%v", b.Name(), d))
+
+        d := money.Get()
+        fmt.Println(fmt.Sprintf("%s\t:get,%v", b.Name(), d))
+    }
+```
+
 <!--- Deprecated
 ## Validator
 
@@ -147,7 +164,7 @@ It is a powerful-tool of request.It contains log/retry.
 
 It is a distributed lock with signle instance by redis.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool/lock.go)
+[example](https://github.com/neo532/gofr/blob/master/tool/example/tool/lock.go)
 
 ```go
     package main
@@ -176,7 +193,7 @@ It is a distributed lock with signle instance by redis.
             })
         }
 
-        Lock := tool.NewLock(rdb)
+        Lock = tool.NewLock(rdb)
     }
 
     func main() {
@@ -195,7 +212,7 @@ It is a distributed lock with signle instance by redis.
 
 It is a frequency with signle instance by redis.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool/freq.go)
+[example](https://github.com/neo532/gofr/blob/master/example/tool/freq.go)
 
 ```go
     package main
@@ -224,7 +241,7 @@ It is a frequency with signle instance by redis.
             })
         }
 
-        Freq := tool.NewFreq(rdb)
+        Freq = tool.NewFreq(rdb)
         Freq.Timezone("Local")
     }
 
@@ -246,7 +263,7 @@ It is a frequency with signle instance by redis.
 
 It is a tool to page slice.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/tool/page_exec.go)
+[example](https://github.com/neo532/gofr/blob/master/tool/example/page_exec.go)
 
 ```go
     package main

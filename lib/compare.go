@@ -12,34 +12,42 @@ import (
 	"strings"
 )
 
+const (
+	Larger  = 1
+	Smaller = -1
+	Equal   = 0
+	Error   = -2
+)
+
 // CompareVersion returns the num after comparing two versions.
-//ver1 > ver2 = 1
-//ver1 < ver2 = -1
-//ver1 = ver2 = 0
+//  1: ver1 > ver2
+//  0: ver1 = ver2
+// -1: ver1 < ver2
+// -2: has error
 func CompareVersion(ver1, ver2 string) int {
-	larger := 1
-	smaller := -1
-	v1 := strings.Split(ver1, ".")
-	v2 := strings.Split(ver2, ".")
+	larger := Larger
+	smaller := Smaller
+	v1 := strings.Split(strings.Trim(ver1, "."), ".")
+	v2 := strings.Split(strings.Trim(ver2, "."), ".")
 	v1Len := len(v1)
 	v2Len := len(v2)
 
-	//make sure that v1's length is larger
+	//make sure that v1's length is longer than v2.
 	if v1Len < v2Len {
 		v1, v2 = v2, v1
 		v1Len, v2Len = v2Len, v1Len
 		larger, smaller = smaller, larger
 	}
 
-	v2MaxIndex := v2Len - 1
 	var v1i, v2i int
-	for i, v := range v1 {
-		if i > v2MaxIndex {
-			return larger
+	var err error
+	for i := 0; i < v2Len; i++ {
+		if v1i, err = strconv.Atoi(v1[i]); err != nil {
+			return Error
 		}
-
-		v1i, _ = strconv.Atoi(v)
-		v2i, _ = strconv.Atoi(v2[i])
+		if v2i, err = strconv.Atoi(v2[i]); err != nil {
+			return Error
+		}
 		if v1i > v2i {
 			return larger
 		}
@@ -47,5 +55,9 @@ func CompareVersion(ver1, ver2 string) int {
 			return smaller
 		}
 	}
-	return 0
+
+	if v1Len != v2Len {
+		return larger
+	}
+	return Equal
 }
