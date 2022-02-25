@@ -48,7 +48,7 @@ func TestVarStorageByLock(t *testing.T) {
 	d := user.Get(c)
 	fmt.Println(fmt.Sprintf("%s\t:get,%v", t.Name(), d))
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * 3)
 }
 
 func TestVarStorageByTick(t *testing.T) {

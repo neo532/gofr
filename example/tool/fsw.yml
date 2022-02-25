@@ -7,7 +7,8 @@ triggers:
   - '**/*.py'
   env:
     DEBUG: "1"
-  cmd: go test
+  cmd: go test -test.run TestGuardpanic
+  #cmd: go test -v ./ -test.run TestGuardpanic
   shell: true
   delay: 100ms
   stop_timeout: 500ms

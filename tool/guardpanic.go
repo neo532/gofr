@@ -11,55 +11,114 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"sync"
+	"time"
 )
 
-// guardpanic is a statement of guardpanic.
-type guardpanic struct {
-	restartTimes  int
-	workerFn      func()
-	errCallBackFn func(c context.Context, err error)
-	ctx           context.Context
+type GoFunc struct {
+	timeout time.Duration
+	errFn   func(c context.Context, err error)
 }
+type GFopt func(*GoFunc)
 
-// Recover is a method for panic.
-func (gp *guardpanic) Recover() {
-
-	if r := recover(); r != nil {
-
-		if gp.errCallBackFn != nil {
-			gp.errCallBackFn(
-				gp.ctx,
-				fmt.Errorf("%s, %s",
-					r,
-					string(debug.Stack()),
-				),
-			)
-		}
-
-		if gp.restartTimes > 0 {
-
-			gp.restartTimes--
-			go Run(
-				gp.ctx,
-				gp.workerFn,
-				gp.restartTimes,
-				gp.errCallBackFn,
-			)
-		}
+// ErrFunc sets the handle of error for GoFunc.
+func (l GFopt) ErrFunc(fn func(c context.Context, err error)) GFopt {
+	return func(v *GoFunc) {
+		v.errFn = fn
 	}
 }
 
-// Run is a function for goroutine.
-func Run(c context.Context, worker func(), times int, cb func(c context.Context, err error)) {
-
-	gp := &guardpanic{
-		workerFn:      worker,
-		restartTimes:  times,
-		errCallBackFn: cb,
-		ctx:           c,
+func NewGoFunc(opts ...GFopt) *GoFunc {
+	gf := &GoFunc{
+		errFn: defErrFn,
 	}
-	defer gp.Recover()
+	for _, o := range opts {
+		o(gf)
+	}
+	return gf
+}
 
-	go worker()
-	return
+func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
+	var wg sync.WaitGroup
+	wg.Add(len(fns))
+	for i, fn := range fns {
+
+		go func(j int) {
+			defer wg.Done()
+			finish := make(chan struct{}, 1)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						g.errFn(
+							c,
+							fmt.Errorf("[%d][%s][%s]", j, r, string(debug.Stack())),
+						)
+					}
+				}()
+				fn(j)
+				finish <- struct{}{}
+			}()
+
+			for {
+				select {
+				case <-time.After(ts):
+					fmt.Println("timeout")
+					return
+				case <-finish:
+					fmt.Println("finish")
+					return
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
+func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
+	var wg sync.WaitGroup
+	wg.Add(len(fns))
+	for i, fn := range fns {
+
+		go func(j int) {
+			defer func() {
+				if r := recover(); r != nil {
+					g.errFn(
+						c,
+						fmt.Errorf("[%d][%s][%s]", j, r, string(debug.Stack())),
+					)
+				}
+			}()
+			defer wg.Done()
+			fn(j)
+		}(i)
+	}
+	wg.Wait()
+}
+
+func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				g.errFn(
+					c,
+					fmt.Errorf("[%s][%s]", r, string(debug.Stack())),
+				)
+			}
+		}()
+		g.WithTimeout(c, ts, fns...)
+	}()
+}
+
+func (g *GoFunc) AsyncGo(c context.Context, fns ...func(i int)) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				g.errFn(
+					c,
+					fmt.Errorf("[%s][%s]", r, string(debug.Stack())),
+				)
+			}
+		}()
+		g.Go(c, fns...)
+	}()
 }

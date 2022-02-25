@@ -2,7 +2,6 @@ package tool
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"time"
 )
@@ -14,14 +13,6 @@ import (
  * @date 2020-10-05
  * @example: github.com/neo532/gofr/blob/main/example/tool/variable_test.go
  */
-var (
-	defTickDuration = time.Second
-	defErrFn        = func(c context.Context, err error) {
-		fmt.Println(fmt.Sprintf("IVarStorageByTick has error[%v]", err))
-	}
-	defCtx   = context.Background()
-	defRetry = 1
-)
 
 // ========== IVarStorageByLock ==========
 
@@ -33,13 +24,13 @@ type IVarStorageByLock interface {
 
 // VarStorageByLock is the struct for NewVarStorageByLock.
 type VarStorageByLock struct {
-	data atomic.Value
-	opFn IVarStorageByLock
-	lock *NoSpinLock
+	data    atomic.Value
+	opFn    IVarStorageByLock
+	lock    *NoSpinLock
+	timeout time.Duration
 
 	duration time.Duration
 	errFn    func(c context.Context, err error)
-	retry    int
 	ctx      context.Context
 }
 
@@ -62,17 +53,17 @@ func (l VSLopt) Duration(t time.Duration) VSLopt {
 	}
 }
 
+// Timeout sets timeout for VarStorageByLock.
+func (l VSLopt) Timeout(t time.Duration) VSLopt {
+	return func(v *VarStorageByLock) {
+		v.timeout = t
+	}
+}
+
 // ErrFun sets the handle of error for VarStorageByLock.
 func (l VSLopt) ErrFun(fn func(c context.Context, err error)) VSLopt {
 	return func(v *VarStorageByLock) {
 		v.errFn = fn
-	}
-}
-
-// Retry sets the times for VarStorageByLock.
-func (l VSLopt) Retry(r int) VSLopt {
-	return func(v *VarStorageByLock) {
-		v.retry = r
 	}
 }
 
@@ -86,10 +77,10 @@ func (l VSLopt) Context(c context.Context) VSLopt {
 // NewVarStorageByLock returns a instance of updating data by locking.
 func NewVarStorageByLock(opts ...VSLopt) (l *VarStorageByLock) {
 	l = &VarStorageByLock{
-		duration: defTickDuration,
+		timeout:  0,
+		duration: defDuration,
 		errFn:    defErrFn,
-		retry:    defRetry,
-		ctx:      defCtx,
+		ctx:      context.Background(),
 	}
 
 	for _, o := range opts {
@@ -99,20 +90,19 @@ func NewVarStorageByLock(opts ...VSLopt) (l *VarStorageByLock) {
 	l.lock = &NoSpinLock{}
 	l.set(l.ctx)
 
-	Run(
-		l.ctx,
-		func() {
-			tick := time.Tick(l.duration)
-			for {
-				select {
-				case <-tick:
-					l.lock.Unlock()
-				}
+	fn := func(i int) {
+		tick := time.Tick(l.duration)
+		for {
+			select {
+			case <-tick:
+				l.lock.Unlock()
 			}
-		},
-		l.retry,
-		l.errFn,
-	)
+		}
+	}
+
+	var opt GFopt
+	NewGoFunc(opt.ErrFunc(l.errFn)).AsyncGo(l.ctx, fn)
+
 	return l
 }
 
@@ -145,9 +135,9 @@ type VarStorageByTick struct {
 	data     atomic.Value
 	opFn     IVarStorageByTick
 	duration time.Duration
+	timeout  time.Duration
 
 	errFn func(c context.Context, err error)
-	retry int
 	ctx   context.Context
 }
 
@@ -170,17 +160,17 @@ func (t VSTopt) Duration(s time.Duration) VSTopt {
 	}
 }
 
+// Timeout sets timeout for VarStorageByTick.
+func (l VSTopt) Timeout(t time.Duration) VSTopt {
+	return func(v *VarStorageByTick) {
+		v.timeout = t
+	}
+}
+
 // ErrFun sets the handle of error for VarStorageByTick.
 func (t VSTopt) ErrFun(fn func(c context.Context, err error)) VSTopt {
 	return func(v *VarStorageByTick) {
 		v.errFn = fn
-	}
-}
-
-// Retry sets the times for VarStorageByTick.
-func (t VSTopt) Retry(r int) VSTopt {
-	return func(v *VarStorageByTick) {
-		v.retry = r
 	}
 }
 
@@ -194,10 +184,10 @@ func (t VSTopt) Context(c context.Context) VSTopt {
 // NewVarStorageByTick returns a instance of updating data by ticking.
 func NewVarStorageByTick(opts ...VSTopt) (l *VarStorageByTick) {
 	l = &VarStorageByTick{
-		duration: defTickDuration,
+		duration: defDuration,
+		timeout:  defTimeout,
 		errFn:    defErrFn,
-		ctx:      defCtx,
-		retry:    defRetry,
+		ctx:      context.Background(),
 	}
 	for _, o := range opts {
 		o(l)
@@ -205,21 +195,20 @@ func NewVarStorageByTick(opts ...VSTopt) (l *VarStorageByTick) {
 
 	l.set()
 
-	Run(
-		l.ctx,
-		func() {
-			tick := time.Tick(l.duration)
-			for {
-				select {
-				case <-tick:
-					l.set()
-				}
+	fn := func(i int) {
+		tick := time.Tick(l.duration)
+		for {
+			select {
+			case <-tick:
+				l.set()
 			}
-		},
-		l.retry,
-		l.errFn,
-	)
-	return
+		}
+	}
+
+	var opt GFopt
+	NewGoFunc(opt.ErrFunc(l.errFn)).AsyncGo(l.ctx, fn)
+
+	return l
 }
 
 func (l *VarStorageByTick) set() {
