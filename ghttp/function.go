@@ -17,12 +17,10 @@ import (
 	"github.com/neo532/gofr/lib"
 )
 
+// Form's delimiter.
 const (
-	// FORM_AND is a delimiter that means and.
-	FORM_AND = "&"
-	// FORM_ASSIGN is a delimiter that means set.
-	FORM_ASSIGN = "="
-	// FORM_ASSIGN_SLICE is a delimiter that means slice.
+	FORM_AND          = "&"
+	FORM_ASSIGN       = "="
 	FORM_ASSIGN_SLICE = "[]="
 )
 
@@ -38,7 +36,7 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 		T = T.Elem()
 		V = V.Elem()
 	default:
-		err = E_MUST_BE_STRUCT
+		err = ErrMustBeStruct
 		return
 	}
 
@@ -90,12 +88,12 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 				case reflect.Bool:
 					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatBool(v.Bool()))
 				default:
-					err = E_NOT_SUPPORT_TYPE
+					err = ErrNotSupportType
 					return
 				}
 			}
 		default:
-			err = E_NOT_SUPPORT_TYPE
+			err = ErrNotSupportType
 			return
 		}
 	}

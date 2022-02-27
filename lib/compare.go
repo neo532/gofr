@@ -19,7 +19,7 @@ const (
 	Smaller = -1
 	// Equal is value of compare.It means ver1 is equal with ver2.
 	Equal = 0
-	// Equal is value of compare.It means having a error.
+	// Error is value of compare.It means having a error.
 	Error = -2
 )
 

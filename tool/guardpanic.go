@@ -21,7 +21,7 @@ type GoFunc struct {
 	errFn   func(c context.Context, err error)
 }
 
-// GoFunc is a object for guard goroutine and panic.
+// GFopt is a object for guard goroutine and panic.
 type GFopt func(*GoFunc)
 
 // ErrFunc sets the handle of error for GoFunc.
