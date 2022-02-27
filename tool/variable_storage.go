@@ -161,9 +161,9 @@ func (t VSTopt) Duration(s time.Duration) VSTopt {
 }
 
 // Timeout sets timeout for VarStorageByTick.
-func (l VSTopt) Timeout(t time.Duration) VSTopt {
+func (t VSTopt) Timeout(ts time.Duration) VSTopt {
 	return func(v *VarStorageByTick) {
-		v.timeout = t
+		v.timeout = ts
 	}
 }
 

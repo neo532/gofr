@@ -72,7 +72,7 @@ func NewDistributedLock(d IDistributedLockDb) *DistributedLock {
 	}
 }
 
-// GenCodeFun returns a unique code.
+// GenUniqCodeFn returns a unique code.
 func (l *DistributedLock) GenUniqCodeFn(fn func() (s string, err error)) *DistributedLock {
 	l.genCode = fn
 	return l

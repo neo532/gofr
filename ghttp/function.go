@@ -18,8 +18,11 @@ import (
 )
 
 const (
-	FORM_AND          = "&"
-	FORM_ASSIGN       = "="
+	// FORM_AND is a delimiter that means and.
+	FORM_AND = "&"
+	// FORM_ASSIGN is a delimiter that means set.
+	FORM_ASSIGN = "="
+	// FORM_ASSIGN_SLICE is a delimiter that means slice.
 	FORM_ASSIGN_SLICE = "[]="
 )
 

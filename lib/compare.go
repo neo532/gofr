@@ -13,10 +13,14 @@ import (
 )
 
 const (
-	Larger  = 1
+	// Larger is value of compare.It means ver1 is larger than ver2.
+	Larger = 1
+	// Smaller is value of compare.It means ver1 is smaller than ver2.
 	Smaller = -1
-	Equal   = 0
-	Error   = -2
+	// Equal is value of compare.It means ver1 is equal with ver2.
+	Equal = 0
+	// Equal is value of compare.It means having a error.
+	Error = -2
 )
 
 // CompareVersion returns the num after comparing two versions.

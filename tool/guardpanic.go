@@ -15,10 +15,13 @@ import (
 	"time"
 )
 
+// GoFunc is a function for a goroutine.
 type GoFunc struct {
 	timeout time.Duration
 	errFn   func(c context.Context, err error)
 }
+
+// GoFunc is a object for guard goroutine and panic.
 type GFopt func(*GoFunc)
 
 // ErrFunc sets the handle of error for GoFunc.
@@ -28,6 +31,7 @@ func (l GFopt) ErrFunc(fn func(c context.Context, err error)) GFopt {
 	}
 }
 
+// NewGoFunc returns a instance of GoFunc.
 func NewGoFunc(opts ...GFopt) *GoFunc {
 	gf := &GoFunc{
 		errFn: defErrFn,
@@ -38,6 +42,7 @@ func NewGoFunc(opts ...GFopt) *GoFunc {
 	return gf
 }
 
+// WithTimeout is a way that running groutine slice by limiting time is synchronized.
 func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
@@ -74,6 +79,7 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 	wg.Wait()
 }
 
+// Go is a way that running groutine slice is synchronized.
 func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
@@ -95,6 +101,7 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 	wg.Wait()
 }
 
+// AsyncWithTimeout is a way that running groutine slice by limiting time is asynchronized.
 func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
 	go func() {
 		defer func() {
@@ -109,6 +116,7 @@ func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...fu
 	}()
 }
 
+// AsyncGo is a way that running groutine slice is asynchronized.
 func (g *GoFunc) AsyncGo(c context.Context, fns ...func(i int)) {
 	go func() {
 		defer func() {

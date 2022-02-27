@@ -10,6 +10,8 @@ import "errors"
  */
 
 var (
+	// E_NOT_SUPPORT_TYPE is a type of error that means invaild type.
 	E_NOT_SUPPORT_TYPE error = errors.New("Invaild type,within string,int,int64,uint64,float64,[]string,[]int,[]int64,[]uint64,[]float64!")
-	E_MUST_BE_STRUCT   error = errors.New("QueryArgs must be a struct or a struct pointer!")
+	// E_NOT_SUPPORT_TYPE is a type of error that means the type must be a struct.
+	E_MUST_BE_STRUCT error = errors.New("QueryArgs must be a struct or a struct pointer!")
 )

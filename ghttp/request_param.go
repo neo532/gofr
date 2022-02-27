@@ -38,7 +38,7 @@ import (
 	"time"
 )
 
-// HTTP is Request's HTTPeter.
+// Param is Request's HTTPeter.
 type Param struct {
 	Body     io.Reader
 	BodyCurl string
