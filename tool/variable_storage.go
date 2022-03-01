@@ -11,7 +11,7 @@ import (
  * @author liuxiaofeng
  * @mail neo532@126.com
  * @date 2020-10-05
- * @example: github.com/neo532/gofr/blob/main/example/tool/variable_test.go
+ * @example: https://github.com/neo532/gofr/blob/master/example/tool/variable_storage_test.go
  */
 
 // ========== IVarStorageByLock ==========
