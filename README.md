@@ -35,7 +35,7 @@ To install Gofr package, you need to install Go and set your Go workspace first.
     import "github.com/neo532/gofr"
 ```
 
-### Page Execute
+### Efficient Cache
 
 It makes getting remote data like getting variable.
 
@@ -100,7 +100,7 @@ It is a powerful-tool of verification,conversion and filter. So simply,good expa
 
 It is a powerful-tool of request.It contains log/retry.
 
-[click me to code](https://github.com/neo532/gofr/blob/master/ghttp)
+[example](https://github.com/neo532/gofr/blob/master/example/ghttp/ghttp_test.go)
 
 ```go
     package main
@@ -164,7 +164,7 @@ It is a powerful-tool of request.It contains log/retry.
 
 It is a distributed lock with signle instance by redis.
 
-[example](https://github.com/neo532/gofr/blob/master/tool/example/tool/lock.go)
+[example](https://github.com/neo532/gofr/blob/master/example/tool/lock_distributed_test.go)
 
 ```go
     package main
@@ -212,7 +212,7 @@ It is a distributed lock with signle instance by redis.
 
 It is a frequency with signle instance by redis.
 
-[example](https://github.com/neo532/gofr/blob/master/example/tool/freq.go)
+[example](https://github.com/neo532/gofr/blob/master/example/tool/freq_test.go)
 
 ```go
     package main
@@ -263,7 +263,7 @@ It is a frequency with signle instance by redis.
 
 It is a tool to page slice.
 
-[example](https://github.com/neo532/gofr/blob/master/tool/example/page_exec.go)
+[example](https://github.com/neo532/gofr/blob/master/example/tool/page_exec_test.go)
 
 ```go
     package main
