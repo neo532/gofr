@@ -44,6 +44,9 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 	var b bytes.Buffer
 	for i := 0; i < T.NumField(); i++ {
 		field := T.Field(i)
+		if field.PkgPath != "" && !field.Anonymous { // unexported
+			continue
+		}
 		value := V.Field(i)
 
 		name := field.Tag.Get(TagName)
