@@ -23,6 +23,7 @@ const (
 	FORM_ASSIGN       = "="
 	FORM_ASSIGN_SLICE = "[]="
 )
+var TagName = "form"
 
 // Struct2QueryArgs turn the struct data to string data.
 func Struct2QueryArgs(param interface{}) (s string, err error) {
@@ -43,9 +44,12 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 	var b bytes.Buffer
 	for i := 0; i < T.NumField(); i++ {
 		field := T.Field(i)
+		if field.PkgPath != "" && !field.Anonymous { // unexported
+			continue
+		}
 		value := V.Field(i)
 
-		name := field.Tag.Get("form")
+		name := field.Tag.Get(TagName)
 		// don't parse that the name is -.
 		if name == "-" {
 			continue
