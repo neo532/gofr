@@ -79,9 +79,9 @@ func Struct2QueryArgs(param interface{}) (s string, err error) {
 				switch v.Kind() {
 				case reflect.String:
 					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, url.QueryEscape(v.String()))
-				case reflect.Int, reflect.Int64:
+				case reflect.Int, reflect.Int64, reflect.Int32:
 					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatInt(v.Int(), 10))
-				case reflect.Uint64:
+				case reflect.Uint64, reflect.Uint32:
 					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatUint(v.Uint(), 10))
 				case reflect.Float64:
 					b = lib.StrBJoin(b, FORM_AND, name, FORM_ASSIGN_SLICE, strconv.FormatFloat(v.Float(), 'f', -1, 64))
