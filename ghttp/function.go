@@ -21,7 +21,7 @@ import (
 const (
 	FORM_AND          = "&"
 	FORM_ASSIGN       = "="
-	FORM_ASSIGN_SLICE = "[]="
+	FORM_ASSIGN_SLICE = "%5B%5D="
 )
 var TagName = "form"
 
