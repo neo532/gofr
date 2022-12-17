@@ -33,7 +33,7 @@ func PageExec(total int, pageSize int, fn func(begin, end, page int)(err error))
 			e = total
 		}
 
-		if err := fn(b, e, i); err != nil {
+		if err := fn(b, e, i+1); err != nil {
 			return
 		}
 	}
