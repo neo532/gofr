@@ -18,7 +18,7 @@ import (
 )
 
 // PageExec make slice execute in paging.
-func PageExec(total int, pageSize int, fn func(begin, end int)) {
+func PageExec(total int, pageSize int, fn func(begin, end, page int)(err error)) {
 	if total == 0 || pageSize == 0 {
 		return
 	}
@@ -33,7 +33,9 @@ func PageExec(total int, pageSize int, fn func(begin, end int)) {
 			e = total
 		}
 
-		fn(b, e)
+		if err := fn(b, e, i); err != nil {
+			return
+		}
 	}
 	return
 }
