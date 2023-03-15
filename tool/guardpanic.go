@@ -60,7 +60,7 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 						)
 					}
 				}()
-				fns[i](j)
+				fns[j](j)
 				finish <- struct{}{}
 			}()
 
@@ -94,7 +94,7 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 				}
 			}()
 			defer wg.Done()
-			fn[j](j)
+			fns[j](j)
 		}(i)
 	}
 	wg.Wait()
