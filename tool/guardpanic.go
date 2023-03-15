@@ -46,7 +46,7 @@ func NewGoFunc(opts ...GFopt) *GoFunc {
 func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
-	for i, fn := range fns {
+	for i := range fns {
 
 		go func(j int) {
 			defer wg.Done()
@@ -60,17 +60,16 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 						)
 					}
 				}()
-				fn(j)
+				fns[i](j)
 				finish <- struct{}{}
 			}()
 
 			for {
 				select {
 				case <-time.After(ts):
-					fmt.Println("timeout")
+					g.errFn(c, fmt.Errorf("[%d]timeout", j))
 					return
 				case <-finish:
-					fmt.Println("finish")
 					return
 				}
 			}
@@ -83,7 +82,7 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
-	for i, fn := range fns {
+	for i := range fns {
 
 		go func(j int) {
 			defer func() {
@@ -95,7 +94,7 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 				}
 			}()
 			defer wg.Done()
-			fn(j)
+			fn[j](j)
 		}(i)
 	}
 	wg.Wait()
