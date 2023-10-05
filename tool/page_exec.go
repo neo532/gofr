@@ -18,18 +18,19 @@ import (
 )
 
 // PageExec make slice execute in paging.
-func PageExec(total int, pageSize int, fn func(begin, end, page int)(err error)) {
+func PageExec(total int64, pageSize int, fn func(begin, end int64, page int) (err error)) {
 	if total == 0 || pageSize == 0 {
 		return
 	}
 	pageNum := int(math.Ceil(float64(total) / float64(pageSize)))
-	
-	var b, e, i int
+
+	var b, e int64
+	var i int
 	for i = 0; i < pageNum; i++ {
 
-		b = i * pageSize
+		b = int64(i) * int64(pageSize)
 
-		e = b + pageSize
+		e = b + int64(pageSize)
 		if e > total {
 			e = total
 		}
