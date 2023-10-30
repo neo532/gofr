@@ -44,6 +44,6 @@ func Science2Int(science string) (i int64, err error) {
 		return
 	}
 	s := fmt.Sprintf("%.0f", f)
-	i, err = strconv.ParseInt(s, 64, 10)
+	i, err = strconv.ParseInt(s, 10, 64)
 	return
 }
