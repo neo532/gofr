@@ -8,7 +8,9 @@ package lib
  */
 
 import (
+	"fmt"
 	"math/big"
+	"strconv"
 )
 
 // Add returns the sum by two int64.
@@ -34,4 +36,14 @@ func Pow(x, y int) int64 {
 		bR = bR.Mul(bR, bX)
 	}
 	return bR.Int64()
+}
+
+func Science2Int(science string) (i int64, err error) {
+	var f float64
+	if _, err = fmt.Sscanf(science, "%e", &f); err != nil {
+		return
+	}
+	s := fmt.Sprintf("%.0f", f)
+	i, err = strconv.ParseInt(s, 64, 10)
+	return
 }
