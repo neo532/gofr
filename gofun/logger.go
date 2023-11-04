@@ -10,7 +10,6 @@ package gofun
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -31,7 +30,6 @@ func (l *DefaultLogger) Error(c context.Context, message string) {
 }
 
 func (l *DefaultLogger) Info(c context.Context, message string) {
-	fmt.Println(fmt.Sprintf("%+v", message))
 }
 
 func (l *DefaultLogger) Err() error {
