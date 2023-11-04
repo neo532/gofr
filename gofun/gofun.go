@@ -43,7 +43,7 @@ func NewGoFunc(opts ...opt) *GoFunc {
 }
 
 // WithTimeout is a way that running groutine slice by limiting time is synchronized.
-func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
+func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int) error) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
 	for i, fn := range fns {
@@ -60,7 +60,9 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 						)
 					}
 				}()
-				fn(j)
+				if err := fn(j); err != nil {
+					g.log.Error(c, err.Error())
+				}
 				finish <- j
 			}()
 
@@ -80,7 +82,7 @@ func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i 
 }
 
 // Go is a way that running groutine slice is synchronized.
-func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
+func (g *GoFunc) Go(c context.Context, fns ...func(i int) error) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
 	for i, fn := range fns {
@@ -95,14 +97,16 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int)) {
 				}
 			}()
 			defer wg.Done()
-			fn(j)
+			if err := fn(j); err != nil {
+				g.log.Error(c, err.Error())
+			}
 		}(i)
 	}
 	wg.Wait()
 }
 
 // AsyncWithTimeout is a way that running groutine slice by limiting time is asynchronized.
-func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...func(i int)) {
+func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...func(i int) error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -117,7 +121,7 @@ func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...fu
 }
 
 // AsyncGo is a way that running groutine slice is asynchronized.
-func (g *GoFunc) AsyncGo(c context.Context, fns ...func(i int)) {
+func (g *GoFunc) AsyncGo(c context.Context, fns ...func(i int) error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

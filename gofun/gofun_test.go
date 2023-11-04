@@ -2,6 +2,7 @@ package gofun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
@@ -10,9 +11,11 @@ import (
 
 func TestWithTimeout(t *testing.T) {
 	c := context.Background()
-	fn := func(i int) {
-		time.Sleep(3 * time.Second)
+	fn := func(i int) (err error) {
+		time.Sleep(1 * time.Second)
 		fmt.Println(fmt.Sprintf("%s\t:Biz run,%d", t.Name(), i))
+		err = errors.New("aaaaaaa")
+		return
 	}
 	fmt.Println(runtime.Caller(0))
 
