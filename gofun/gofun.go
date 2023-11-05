@@ -13,6 +13,8 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // GoFunc is a function for a goroutine.
@@ -44,41 +46,36 @@ func NewGoFunc(opts ...opt) *GoFunc {
 
 // WithTimeout is a way that running groutine slice by limiting time is synchronized.
 func (g *GoFunc) WithTimeout(c context.Context, ts time.Duration, fns ...func(i int) error) {
-	var wg sync.WaitGroup
-	wg.Add(len(fns))
+	l := len(fns)
+	finish := make(chan int, l)
+	defer close(finish)
 	for i, fn := range fns {
 
 		go func(j int) {
-			defer wg.Done()
-			finish := make(chan int, 1)
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						g.log.Error(
-							c,
-							fmt.Sprintf("[%d][%s][%s]", j, r, string(debug.Stack())),
-						)
-					}
-				}()
-				if err := fn(j); err != nil {
-					g.log.Error(c, err.Error())
-				}
+			defer func() {
 				finish <- j
-			}()
-
-			for {
-				select {
-				case <-time.After(ts):
-					g.log.Error(c, fmt.Sprintf("Timeout!,goroutines faild to finish within the specified %v", ts))
-					return
-				case n := <-finish:
-					g.log.Info(c, fmt.Sprintf("Finish %dth", n))
-					return
+				if r := recover(); r != nil {
+					g.log.Error(
+						c,
+						fmt.Sprintf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
+					)
 				}
+			}()
+			if err := fn(j); err != nil {
+				g.log.Error(c, errors.Wrapf(err, "[%dth]", j).Error())
 			}
 		}(i)
 	}
-	wg.Wait()
+
+	for i := 0; i < l; i++ {
+		select {
+		case <-time.After(ts):
+			g.log.Error(c, fmt.Sprintf("Timeout!,goroutines faild to finish within the specified %v", ts))
+			return
+		case n := <-finish:
+			g.log.Info(c, fmt.Sprintf("Finish %dth", n))
+		}
+	}
 }
 
 // Go is a way that running groutine slice is synchronized.
@@ -89,14 +86,14 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int) error) {
 
 		go func(j int) {
 			defer func() {
+				wg.Done()
 				if r := recover(); r != nil {
 					g.log.Error(
 						c,
-						fmt.Sprintf("[%d][%s][%s]", j, r, string(debug.Stack())),
+						fmt.Sprintf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
 					)
 				}
 			}()
-			defer wg.Done()
 			if err := fn(j); err != nil {
 				g.log.Error(c, err.Error())
 			}
@@ -108,14 +105,6 @@ func (g *GoFunc) Go(c context.Context, fns ...func(i int) error) {
 // AsyncWithTimeout is a way that running groutine slice by limiting time is asynchronized.
 func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...func(i int) error) {
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				g.log.Error(
-					c,
-					fmt.Sprintf("[%s][%s]", r, string(debug.Stack())),
-				)
-			}
-		}()
 		g.WithTimeout(c, ts, fns...)
 	}()
 }
@@ -123,14 +112,6 @@ func (g *GoFunc) AsyncWithTimeout(c context.Context, ts time.Duration, fns ...fu
 // AsyncGo is a way that running groutine slice is asynchronized.
 func (g *GoFunc) AsyncGo(c context.Context, fns ...func(i int) error) {
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				g.log.Error(
-					c,
-					fmt.Sprintf("[%s][%s]", r, string(debug.Stack())),
-				)
-			}
-		}()
 		g.Go(c, fns...)
 	}()
 }

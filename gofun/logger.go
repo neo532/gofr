@@ -9,8 +9,9 @@ package gofun
 
 import (
 	"context"
-	"errors"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 type Logger interface {
@@ -25,8 +26,12 @@ type DefaultLogger struct {
 
 func (l *DefaultLogger) Error(c context.Context, message string) {
 	l.lock.Lock()
+	defer l.lock.Unlock()
+	if l.err != nil {
+		l.err = errors.Wrap(l.err, message)
+		return
+	}
 	l.err = errors.New(message)
-	l.lock.Unlock()
 }
 
 func (l *DefaultLogger) Info(c context.Context, message string) {
