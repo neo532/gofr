@@ -1,4 +1,4 @@
-package gofun
+package gofunc
 
 /*
  * @abstract guard panic
