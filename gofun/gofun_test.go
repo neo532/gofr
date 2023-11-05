@@ -10,20 +10,20 @@ import (
 func TestWithTimeout(t *testing.T) {
 	c := context.Background()
 	fn := func(i int) (err error) {
-		time.Sleep(2 * time.Second)
+		time.Sleep(5 * time.Second)
 		fmt.Println(fmt.Sprintf("%s\t:Biz run,%d", t.Name(), i))
 		//err = errors.New("aaaaaaa")
 		return
 	}
 
 	log := &DefaultLogger{}
-	gofn := NewGoFunc(WithLogger(log))
+	gofn := NewGoFunc(WithLogger(log), WithMaxGoroutine(20))
 
 	gofn.Go(c, fn, fn, fn)
 
 	gofn.WithTimeout(
 		c,
-		time.Second*3,
+		time.Second*10,
 		fn,
 		fn,
 		fn,
