@@ -6,16 +6,27 @@ import (
 )
 
 func TestRun(t *testing.T) {
-	u := New(WithDelimiter('='))
-	origin := "_123中abc国"
-	en, err := u.Encrypt([]byte(origin))
+	var err error
+	var en string
+	var ori []byte
+
+	origin := "壹_123贰abc叁肆1五1"
+	fmt.Println(fmt.Sprintf("origin:\t%+v", origin))
+
+	u := New(WithDelimiter("=="))
+	en, err = u.Encrypt([]byte(origin))
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(en, err)
+	fmt.Println(fmt.Sprintf("en:\t%+v", en))
+
 	ori, e := u.Decrypt(en)
-	fmt.Println(string(ori), e)
 	if e != nil {
 		t.Error(e)
+	}
+	fmt.Println(fmt.Sprintf("string(ori):\t%+v", string(ori)))
+
+	if string(ori) != (origin) {
+		t.Errorf("not match")
 	}
 }

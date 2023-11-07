@@ -1,8 +1,13 @@
 package unicode
 
 import (
+	"errors"
 	"strconv"
 	"strings"
+)
+
+var (
+	ErrContainDelimiter = errors.New("Please input a string without delimiter")
 )
 
 type Unicode struct {
@@ -11,9 +16,9 @@ type Unicode struct {
 
 type opt func(o *Unicode)
 
-func WithDelimiter(d byte) opt {
+func WithDelimiter(d string) opt {
 	return func(o *Unicode) {
-		o.delimiter = string(d)
+		o.delimiter = d
 	}
 }
 
@@ -28,39 +33,56 @@ func New(opts ...opt) (o *Unicode) {
 }
 
 func (o *Unicode) Encrypt(origin []byte) (en string, err error) {
-	str := []rune(string(origin))
+	ori := string(origin)
+
+	if strings.Contains(ori, o.delimiter) {
+		err = ErrContainDelimiter
+		return
+	}
+
+	str := []rune(ori)
 	l := len(str)
 	var r strings.Builder
+
 	for i := 0; i < l; i++ {
 		s := strconv.QuoteRuneToASCII(str[i])
 		r.WriteString(strings.NewReplacer("\\u", o.delimiter, "'", "").Replace(s))
 	}
+
 	en = r.String()
 	return
 }
 
 func (o *Unicode) Decrypt(en string) (origin []byte, err error) {
-	l := len(en)
 	var r strings.Builder
 
-	var i int
-	for i < l {
-		c := string(en[i])
-		if c != o.delimiter {
-			i++
-			r.WriteString(c)
-			continue
-		}
-		if i+5 <= l {
-			cu := string(en[i+1 : i+5])
-			i += 5
+	itemS := strings.SplitAfter(en, o.delimiter)
+
+	var has bool
+	for _, item := range itemS {
+
+		if has == true {
 			var s string
-			if s, err = strconv.Unquote(`"\u` + cu + `"`); err != nil {
+			if s, err = strconv.Unquote(`"\u` + string(item[:4]) + `"`); err != nil {
 				return
 			}
 			r.WriteString(s)
+			if len(item) >= 5 {
+				item = string(item[4:])
+			}
+			has = false
 		}
+
+		v := strings.TrimSuffix(item, o.delimiter)
+		if v != item {
+			has = true
+			r.WriteString(v)
+			continue
+		}
+
+		r.WriteString(item)
 	}
+
 	origin = []byte(r.String())
 	return
 }
