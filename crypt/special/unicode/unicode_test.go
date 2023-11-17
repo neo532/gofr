@@ -10,7 +10,7 @@ func TestRun(t *testing.T) {
 	var en string
 	var ori []byte
 
-	origin := "壹_123贰abc叁肆1五1"
+	origin := "壹_123贰abc叁肆1五1ABC"
 	fmt.Println(fmt.Sprintf("origin:\t%+v", origin))
 
 	u := New(WithDelimiter("=="))

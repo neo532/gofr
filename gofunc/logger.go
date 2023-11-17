@@ -15,7 +15,7 @@ import (
 )
 
 type Logger interface {
-	Error(c context.Context, message string)
+	Error(c context.Context, err error)
 	Info(c context.Context, message string)
 }
 
@@ -24,14 +24,14 @@ type DefaultLogger struct {
 	lock sync.Mutex
 }
 
-func (l *DefaultLogger) Error(c context.Context, message string) {
+func (l *DefaultLogger) Error(c context.Context, err error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if l.err != nil {
-		l.err = errors.Wrap(l.err, message)
+		l.err = errors.Wrap(l.err, err.Error())
 		return
 	}
-	l.err = errors.New(message)
+	l.err = err
 }
 
 func (l *DefaultLogger) Info(c context.Context, message string) {

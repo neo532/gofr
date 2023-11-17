@@ -1,3 +1,4 @@
 *.sw[op]
 go.sum
 .fsw.yml
+.DS_Store

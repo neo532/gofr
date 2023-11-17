@@ -78,12 +78,12 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 					if r := recover(); r != nil {
 						g.log.Error(
 							c,
-							fmt.Sprintf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
+							errors.Errorf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
 						)
 					}
 				}()
 				if err := fns[j](j); err != nil {
-					g.log.Error(c, errors.Wrapf(err, "[%dth]", j).Error())
+					g.log.Error(c, errors.Wrapf(err, "[%dth]", j))
 				}
 			}(i)
 		}
@@ -109,7 +109,7 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 	for {
 		select {
 		case <-time.After(ts):
-			g.log.Error(c, fmt.Sprintf("Timeout!,goroutines faild to finish within the specified %v", ts))
+			g.log.Error(c, errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts))
 			return
 		case n := <-finish:
 			if n == -1 {
