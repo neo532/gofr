@@ -37,7 +37,7 @@ func TestWithTimeout(t *testing.T) {
 				fns...,
 			)
 			err := log.Err()
-			fmt.Println(fmt.Sprintf("print<<<\t%+v>>>", err))
+			fmt.Println(fmt.Sprintf("print<<<%+v>>>", err))
 		}()
 		select {
 		case <-c.Done():
