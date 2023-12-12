@@ -61,26 +61,34 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 	}
 
 	running := make(chan int, lRunning)
-	defer close(running)
-
 	finish := make(chan int, l)
-	defer close(finish)
+	closeChan := func() {
+		close(running)
+		close(finish)
+	}
 
 	go func() {
+		if r := recover(); r != nil {
+			g.log.Error(
+				c,
+				errors.Errorf("main[%+v][%s]", r, string(debug.Stack())),
+			)
+		}
+
 		var wg sync.WaitGroup
 		wg.Add(l)
 		for i := 0; i < l; i++ {
 			running <- i
 			go func(j int) {
 				defer func() {
-					wg.Done()
-					finish <- j
 					if r := recover(); r != nil {
 						g.log.Error(
 							c,
 							errors.Errorf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
 						)
 					}
+					wg.Done()
+					finish <- j
 				}()
 				if err := fns[j](j); err != nil {
 					g.log.Error(c, errors.Wrapf(err, "[%dth]", j))
@@ -89,6 +97,7 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 		}
 		wg.Wait()
 		finish <- -1
+		closeChan()
 	}()
 
 	if int(ts.Microseconds()) == 0 {
@@ -101,6 +110,9 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 					<-running
 				}
 				g.log.Info(c, fmt.Sprintf("Finish %dth", n))
+			case <-c.Done():
+				g.log.Error(c, errors.Errorf("Main context has Done!"))
+				return
 			}
 		}
 		return
@@ -118,6 +130,9 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 				<-running
 			}
 			g.log.Info(c, fmt.Sprintf("Finish %dth", n))
+		case <-c.Done():
+			g.log.Error(c, errors.Errorf("Main context has Done!"))
+			return
 		}
 	}
 }
