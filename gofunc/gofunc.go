@@ -87,8 +87,8 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 							errors.Errorf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
 						)
 					}
-					wg.Done()
 					finish <- j
+					wg.Done()
 				}()
 				if err := fns[j](j); err != nil {
 					g.log.Error(c, errors.Wrapf(err, "[%dth]", j))
