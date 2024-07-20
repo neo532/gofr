@@ -13,20 +13,22 @@ func createLog() (h *logger.Logger) {
 		return "aa", "bbbbbbbbb"
 	}
 	sp := func(c context.Context) (key string, value interface{}) {
-		fn, file, line := logger.GetSourceByFunctionName(
-			0,
-			20,
-			[]string{"github.com/neo532/gofr/logger/slog"},
-			[]string{
-				"github.com/neo532/gofr/logger/slog.GetSourceByFunctionName",
-				"github.com/neo532/gofr/logger/slog.createLog.func2",
-				"github.com/neo532/gofr/logger/slog.(*Logger).Log",
-				"github.com/neo532/gofr/logger.(*Logger).Errorf",
-				"github.com/neo532/gofr/logger.(*Logger).Error",
-				"github.com/neo532/gofr/logger/slog.(*PrettyHandler).Handle",
-			},
-		)
-		return "source", fmt.Sprintf("%s,%s,%d", fn, file, line)
+		// file, line := logger.GetSourceByFunctionName(
+		// 	0,
+		// 	20,
+		// 	[]string{"github.com/neo532/gofr/logger/slog"},
+		// 	[]string{
+		// 		"github.com/neo532/gofr/logger/slog.GetSourceByFunctionName",
+		// 		"github.com/neo532/gofr/logger/slog.createLog.func2",
+		// 		"github.com/neo532/gofr/logger/slog.(*Logger).Log",
+		// 		"github.com/neo532/gofr/logger.(*Logger).Errorf",
+		// 		"github.com/neo532/gofr/logger.(*Logger).Error",
+		// 		"github.com/neo532/gofr/logger/slog.(*PrettyHandler).Handle",
+		// 	},
+		// )
+
+		file, line := logger.GetSourceByDepth(7)
+		return "source", fmt.Sprintf("%s,%d", file, line)
 	}
 
 	l, err := New(
@@ -48,8 +50,14 @@ func TestLogger(t *testing.T) {
 
 	c := context.Background()
 	h := createLog()
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 2; i++ {
 		h.WithArgs(logger.LogkeyModule, "m1").Error(c, "kkkk", "vvvv", "cc")
 		h.WithArgs(logger.LogkeyModule, "m2").Errorf(c, "kkkk%s", "cc")
 	}
+
+	a(c, h)
+}
+
+func a(c context.Context, h *logger.Logger) {
+	h.WithArgs(logger.LogkeyModule, "m3").Errorf(c, "kkkk%s", "cc")
 }

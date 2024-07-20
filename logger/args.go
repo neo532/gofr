@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func GetSourceByFunctionName(begin, end int, allows, denys []string) (funtionName, file string, line int) {
+func GetSourceByFunctionName(begin, end int, allows, denys []string) (file string, line int) {
 	if allows == nil || denys == nil {
 		return
 	}
@@ -31,11 +31,17 @@ func GetSourceByFunctionName(begin, end int, allows, denys []string) (funtionNam
 			}
 			for _, d := range allows {
 				if strings.HasPrefix(f.Function, d) {
-					return f.Function, f.File, f.Line
+					return f.File, f.Line
 				}
 			}
 
 		}
 	}
-	return f.Function, f.File, f.Line
+	return f.File, f.Line
+}
+
+func GetSourceByDepth(depth int) (file string, line int) {
+	_, file, line, _ = runtime.Caller(depth)
+	return file, line
+
 }
