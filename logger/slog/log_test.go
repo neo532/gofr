@@ -13,7 +13,7 @@ func createLog() (h *logger.Logger) {
 		return "aa", "bbbbbbbbb"
 	}
 	sp := func(c context.Context) (key string, value interface{}) {
-		fn, file, line := GetSourceByFunctionName(
+		fn, file, line := logger.GetSourceByFunctionName(
 			0,
 			20,
 			[]string{"github.com/neo532/gofr/logger/slog"},
