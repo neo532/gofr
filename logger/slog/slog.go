@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"golang.org/x/exp/slog"
-
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/neo532/gofr/logger"
@@ -41,10 +40,9 @@ func New(opts ...Option) (l *Logger, err error) {
 		return
 	}
 
-	l.logger =
-		slog.New(
-			slog.NewJSONHandler(l.syncerConf, l.opts),
-		).With(l.paramGlobal...)
+	l.logger = slog.New(
+		slog.NewJSONHandler(l.syncerConf, l.opts),
+	).With(l.paramGlobal...)
 	return
 }
 
