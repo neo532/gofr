@@ -53,9 +53,14 @@ func WithConnMaxLifetime(t time.Duration) Opt {
 		})
 	}
 }
+func WithRecordNotFoundError(b bool) Opt {
+	return func(o *Orm) {
+		o.gormLogger.recordNotFoundError = b
+	}
+}
 func WithSlowLog(t time.Duration) Opt {
 	return func(o *Orm) {
-		o.slowTime = t
+		o.gormLogger.slowLogTime = t
 	}
 }
 func WithTablePrefix(s string) Opt {
@@ -65,7 +70,7 @@ func WithTablePrefix(s string) Opt {
 }
 func WithLogger(l Logger) Opt {
 	return func(o *Orm) {
-		o.logger = l
+		o.gormLogger.logger = l
 	}
 }
 func WithSingularTable() Opt {
@@ -86,10 +91,9 @@ type Orm struct {
 	err              error
 	bootstrapContext context.Context
 
-	gormOpt  *gormOpt
-	opts     []func(db *sql.DB)
-	slowTime time.Duration
-	logger   Logger
+	gormLogger *gormLogger
+	gormOpt    *gormOpt
+	opts       []func(db *sql.DB)
 }
 
 // New returns a instance of Orm.
@@ -108,7 +112,8 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 		gormOpt: &gormOpt{
 			schema: schema.NamingStrategy{},
 		},
-		opts: make([]func(db *sql.DB), 0),
+		gormLogger: &gormLogger{name: name, logger: NewDefaultLogger()},
+		opts:       make([]func(db *sql.DB), 0),
 	}
 	for _, o := range opts {
 		o(db)
@@ -117,7 +122,7 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 	db.orm, db.err = gorm.Open(
 		dsn,
 		&gorm.Config{
-			Logger:         NewGormLogger(name, db.slowTime, db.logger),
+			Logger:         db.gormLogger,
 			NamingStrategy: db.gormOpt.schema,
 			ClauseBuilders: map[string]clause.ClauseBuilder{
 				//hints.Comment("select", "master"),
@@ -127,21 +132,13 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 	)
 
 	if db.err != nil {
-		db.logger.
-			Errorf(db.bootstrapContext, "Gorm open client[%s] error: %+v",
-				name,
-				db.err,
-			)
+		db.LogError(name, "Gorm open client error")
 		return
 	}
 
 	var sqlDB *sql.DB
 	if sqlDB, db.err = db.orm.DB(); db.err != nil {
-		db.logger.
-			Errorf(db.bootstrapContext, "Orm DB[%s] has error: %+v",
-				name,
-				db.err,
-			)
+		db.LogError(name, "Orm DB has error")
 		return
 	}
 	for _, o := range db.opts {
@@ -150,18 +147,20 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 
 	db.cleanup = func() {
 		if sqlDB == nil {
-			db.logger.
-				Errorf(db.bootstrapContext, "Close db[%s] is nil!", name)
+			db.LogError(name, "Close db is nil!")
 			return
 		}
 		if db.err = sqlDB.Close(); db.err != nil {
-			db.logger.
-				Errorf(db.bootstrapContext, "Close db[%s] has error: %+v", name, db.err)
+			db.LogError(name, "Close db has error!")
 			return
 		}
 	}
 	ormMap[name] = db
 	return
+}
+
+func (o *Orm) LogError(name string, message string) {
+	o.gormLogger.logger.Error(o.bootstrapContext, message, "name", name, "err", o.err)
 }
 
 func (o *Orm) Error() error {
@@ -176,80 +175,59 @@ func (o *Orm) Cleanup() func() {
 	return o.cleanup
 }
 
-type GormLogger struct {
+type gormLogger struct {
 	gorm.Config
 
-	db          string
-	slowLogTime time.Duration
-	logger      Logger
+	name                string
+	slowLogTime         time.Duration
+	logger              Logger
+	recordNotFoundError bool
 
 	LogLevel gLogger.LogLevel
 }
 
-func NewGormLogger(db string, slowLogTime time.Duration, logger Logger) *GormLogger {
-	return &GormLogger{
-		db:          db,
-		slowLogTime: slowLogTime,
-		logger:      logger,
-	}
-}
-
-func (g *GormLogger) LogMode(level gLogger.LogLevel) gLogger.Interface {
+func (g *gormLogger) LogMode(level gLogger.LogLevel) gLogger.Interface {
 	g.LogLevel = level
 	return g
 }
 
-func (g *GormLogger) Info(c context.Context, s string, i ...interface{}) {
-	g.logger.Infof(c, s, i...)
+func (g *gormLogger) Info(c context.Context, s string, i ...interface{}) {
+	g.logger.Info(c, s, i...)
 }
 
-func (g *GormLogger) Warn(c context.Context, s string, i ...interface{}) {
-	g.logger.Warnf(c, s, i...)
+func (g *gormLogger) Warn(c context.Context, s string, i ...interface{}) {
+	g.logger.Warn(c, s, i...)
 }
 
-func (g *GormLogger) Error(c context.Context, s string, i ...interface{}) {
-	g.logger.Errorf(c, s, i...)
+func (g *gormLogger) Error(c context.Context, s string, i ...interface{}) {
+	g.logger.Error(c, s, i...)
 }
 
-func (g *GormLogger) Trace(c context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+func (g *gormLogger) Trace(c context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
 	sql, rows := fc()
 	cost := time.Since(begin)
 
-	if err == gorm.ErrRecordNotFound {
+	if err == gorm.ErrRecordNotFound && !g.recordNotFoundError {
 		err = nil
 	}
 
+	p := []interface{}{
+		"name", g.name,
+		"limit", g.slowLogTime,
+		"cost", cost,
+		"rows", rows,
+	}
+
 	if err != nil {
-		g.logger.
-			Errorf(c, "err:[%+v], name:%s, limit:%v, cost:%v, rows:%d, sql:[%s]",
-				err,
-				g.db,
-				g.slowLogTime,
-				cost,
-				rows,
-				sql,
-			)
+		p = append(p, "err", err)
+		g.logger.Error(c, sql, p...)
 		return
 	}
 
 	if cost > g.slowLogTime {
-		g.logger.
-			Warnf(c, "slowlog, name:%s, limit:%v, cost:%v, rows:%d, sql:[%s]",
-				g.db,
-				g.slowLogTime,
-				cost,
-				rows,
-				sql,
-			)
+		g.logger.Warn(c, "[slow]"+sql, p...)
 		return
 	}
 
-	g.logger.
-		Infof(c, "name:%s, limit:%v, cost:%s, rows:%d, sql:[%s]",
-			g.db,
-			g.slowLogTime,
-			cost,
-			rows,
-			sql,
-		)
+	g.logger.Info(c, sql, p...)
 }

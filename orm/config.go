@@ -14,13 +14,14 @@ type DsnConfig struct {
 }
 
 type OrmConfig struct {
-	MaxOpenConns    int           `yaml:"max_open_conns"`
-	MaxIdleConns    int           `yaml:"max_idle_conns"`
-	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
-	MaxSlowtime     time.Duration `yaml:"max_slowtime"`
-	TablePrefix     string        `yaml:"table_prefix"`
-	Read            []*DsnConfig  `yaml:"read"`
-	Write           []*DsnConfig  `yaml:"write"`
-	ShadowRead      []*DsnConfig  `yaml:"shadow_read"`
-	ShadowWrite     []*DsnConfig  `yaml:"shadow_write"`
+	MaxOpenConns        int           `yaml:"max_open_conns"`
+	MaxIdleConns        int           `yaml:"max_idle_conns"`
+	ConnMaxLifetime     time.Duration `yaml:"conn_max_lifetime"`
+	MaxSlowtime         time.Duration `yaml:"max_slowtime"`
+	TablePrefix         string        `yaml:"table_prefix"`
+	Read                []*DsnConfig  `yaml:"read"`
+	Write               []*DsnConfig  `yaml:"write"`
+	ShadowRead          []*DsnConfig  `yaml:"shadow_read"`
+	ShadowWrite         []*DsnConfig  `yaml:"shadow_write"`
+	RecordNotFoundError bool          `yaml:"record_not_found_error"`
 }

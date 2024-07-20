@@ -12,9 +12,9 @@ import (
  */
 
 type Logger interface {
-	Errorf(c context.Context, format string, p ...interface{})
-	Warnf(c context.Context, format string, p ...interface{})
-	Infof(c context.Context, format string, p ...interface{})
+	Error(c context.Context, message string, kvs ...interface{})
+	Warn(c context.Context, message string, kvs ...interface{})
+	Info(c context.Context, message string, kvs ...interface{})
 }
 
 type DefaultLogger struct {
@@ -23,12 +23,12 @@ type DefaultLogger struct {
 func NewDefaultLogger() *DefaultLogger {
 	return &DefaultLogger{}
 }
-func (l *DefaultLogger) Errorf(c context.Context, format string, p ...interface{}) {
-	fmt.Println(fmt.Sprintf(format, p...))
+func (l *DefaultLogger) Error(c context.Context, message string, kvs ...interface{}) {
+	fmt.Println(append([]interface{}{"msg", message}, kvs...)...)
 }
-func (l *DefaultLogger) Warnf(c context.Context, format string, p ...interface{}) {
-	fmt.Println(fmt.Sprintf(format, p...))
+func (l *DefaultLogger) Warn(c context.Context, message string, kvs ...interface{}) {
+	fmt.Println(append([]interface{}{"msg", message}, kvs...)...)
 }
-func (l *DefaultLogger) Infof(c context.Context, format string, p ...interface{}) {
-	fmt.Println(fmt.Sprintf(format, p...))
+func (l *DefaultLogger) Info(c context.Context, message string, kvs ...interface{}) {
+	fmt.Println(append([]interface{}{"msg", message}, kvs...)...)
 }
