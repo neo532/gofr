@@ -40,7 +40,6 @@ func New(opts ...Option) (l *Logger, err error) {
 		paramContext: make([]logger.ILoggerArgs, 0, 2),
 		syncerConf:   &lumberjack.Logger{},
 		core: zapcore.EncoderConfig{
-			//FunctionKey:    "func",
 			LevelKey:       "level",
 			TimeKey:        "time",
 			CallerKey:      "source",

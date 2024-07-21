@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/neo532/gofr/logger"
 )
@@ -19,8 +20,8 @@ func createLog() (h *logger.Logger) {
 		WithMaxBackups(2),
 		WithMaxSize(2),
 		WithLevel("debug"),
-		WithGlobalParam("a", "b", "1", "2"),
-		WithContextParam(cp),
+		// WithGlobalParam("a", "b", "1", "2"),
+		// WithContextParam(cp),
 		WithCallerSkip(2),
 		//WithPrettyLogger(nil),
 	)
@@ -34,6 +35,9 @@ func TestLogger(t *testing.T) {
 	c := context.Background()
 	h := createLog()
 	for i := 0; i < 1; i++ {
+		h.Error(c, "k")
+		time.Sleep(10 * time.Second)
+		return
 		h.WithArgs(logger.LogkeyModule, "m1").Error(c, "kkkk", "vvvv", "cc")
 		h.WithArgs(logger.LogkeyModule, "m2").Errorf(c, "kkkk%s", "cc")
 	}
