@@ -71,28 +71,24 @@ func WithFilename(s string) Option {
 	}
 }
 
-// 日志的最大大小（M）
 func WithMaxSize(i int) Option {
 	return func(l *Logger) {
 		l.syncerConf.MaxSize = i
 	}
 }
 
-// 日志文件存储最大天数
 func WithMaxAge(i int) Option {
 	return func(l *Logger) {
 		l.syncerConf.MaxAge = i
 	}
 }
 
-// 日志的最大保存数量
 func WithMaxBackups(i int) Option {
 	return func(l *Logger) {
 		l.syncerConf.MaxBackups = i
 	}
 }
 
-// 是否执行压缩
 func WithCompress(b bool) Option {
 	return func(l *Logger) {
 		l.syncerConf.Compress = b
