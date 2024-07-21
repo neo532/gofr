@@ -5,10 +5,6 @@ import (
 	"fmt"
 )
 
-const (
-	levelNil Level = -2
-)
-
 type Logger struct {
 	log        ILogger
 	globalArgs []interface{}
@@ -18,7 +14,7 @@ type Logger struct {
 func NewLogger(l ILogger) *Logger {
 	return &Logger{
 		log:        l,
-		globalArgs: make([]interface{}, 0, 1),
+		globalArgs: make([]interface{}, 0, 2),
 		level:      levelNil,
 	}
 }

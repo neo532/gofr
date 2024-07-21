@@ -5,6 +5,10 @@ import "strings"
 // Level is a logger level.
 type Level int8
 
+const (
+	levelNil Level = -2
+)
+
 // LevelKey is logger level key.
 const LevelKey = "level"
 
