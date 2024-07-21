@@ -37,7 +37,7 @@ func (l *Logger) WithLevel(lv Level) (n *Logger) {
 }
 
 func (l *Logger) isMatchLevel(lv Level) (b bool) {
-	if l.level != levelNil && l.level > LevelError {
+	if l.level != levelNil && l.level > lv {
 		return
 	}
 	return true

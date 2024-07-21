@@ -37,7 +37,7 @@ func TestLogger(t *testing.T) {
 		// h.Error(c, "k")
 		// time.Sleep(10 * time.Second)
 		// return
-		h.WithArgs(logger.LogkeyModule, "m1").WithLevel(logger.LevelFatal).Error(c, "kkkk", "vvvv", "cc")
+		h.WithArgs(logger.LogkeyModule, "m1").WithLevel(logger.LevelWarn).Info(c, "kkkk", "vvvv", "cc")
 		h.WithArgs(logger.LogkeyModule, "m2").Errorf(c, "kkkk%s", "cc")
 	}
 
