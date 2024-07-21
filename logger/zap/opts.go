@@ -1,44 +1,42 @@
-package slog
+package zap
 
+/*
+ * @abstract zap's option
+ * @mail neo532@126.com
+ * @date 2023-08-13
+ */
 import (
+	"io"
 	"os"
 
-	"golang.org/x/exp/slog"
-
 	"github.com/neo532/gofr/logger"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Option func(opt *Logger)
 
-func WithPrettyLogger(handler slog.Handler) Option {
+func WithPrettyLogger(w io.Writer) Option {
 	return func(l *Logger) {
-		if handler == nil {
-			l.logger = slog.New(
-				NewPrettyHandler(os.Stdout, l.opts, l.paramContext),
-			).With(l.paramGlobal...)
-			return
+		if w == nil {
+			w = os.Stdout
 		}
-		l.logger = slog.New(handler).With(l.paramGlobal...)
+		l.logger = zap.New(
+			zapcore.NewCore(
+				zapcore.NewJSONEncoder(l.core),
+				zapcore.AddSync(w),
+				l.levelEnabler,
+			),
+			l.opts...)
+		l.Sync = l.logger.Sync
 		return
 	}
 }
 
-func WithReplaceAttr(fns ...func() (k string, v interface{})) Option {
+func WithCallerSkip(skip int) Option {
 	return func(l *Logger) {
-		l.opts.ReplaceAttr = func(groups []string, a slog.Attr) slog.Attr {
-			for _, fn := range fns {
-				k, v := fn()
-				if k == a.Key {
-					if v == nil {
-						a.Key = k
-						break
-					}
-					a = slog.Any(k, v)
-					break
-				}
-			}
-			return a
-		}
+		l.opts = append(l.opts, zap.WithCaller(true))
+		l.opts = append(l.opts, zap.AddCallerSkip(skip))
 	}
 }
 
@@ -48,20 +46,24 @@ func WithContextParam(fns ...logger.ILoggerArgs) Option {
 	}
 }
 
-func WithGlobalParam(vs ...interface{}) Option {
+func WithGlobalParam(kvs ...interface{}) Option {
 	return func(l *Logger) {
-		l.paramGlobal = vs
+		ls := len(kvs)
+		ps := make([]zap.Field, 0, ls/2)
+		for i := 0; i < ls; i += 2 {
+			k, _ := kvs[i].(string)
+			ps = append(ps, zap.Any(k, kvs[i+1]))
+		}
+		l.opts = append(l.opts, zap.Fields(ps...))
 	}
 }
 
 func WithLevel(lv string) Option {
 	return func(l *Logger) {
-		lvl := (&slog.LevelVar{})
-		if err := lvl.UnmarshalText([]byte(lv)); err != nil && l.err == nil {
+		var err error
+		if l.levelEnabler, err = zapcore.ParseLevel(lv); err != nil {
 			l.err = err
-			return
 		}
-		l.opts.Level = lvl
 	}
 }
 
