@@ -135,9 +135,11 @@ func (m *Orms) Write(c context.Context) (db *gorm.DB) {
 	return m.pooler.Choose(c, m.write).WithContext(c)
 }
 
-func (m *Orms) Transaction(c context.Context, fn func(c context.Context) error) error {
+func (m *Orms) Transaction(c context.Context, fn func(c context.Context) (err error)) error {
 	return m.Write(c).Transaction(func(tx *gorm.DB) error {
-		c = context.WithValue(c, contextTransactionKey{}, tx)
+		if _, ok := c.Value(contextTransactionKey{}).(*gorm.DB); !ok {
+			c = context.WithValue(c, contextTransactionKey{}, tx)
+		}
 		return fn(c)
 	})
 }

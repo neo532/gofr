@@ -16,6 +16,13 @@ import (
 
 type Option func(opt *Logger)
 
+func WithLogger(log *zap.Logger) Option {
+	return func(l *Logger) {
+		l.logger = log
+		return
+	}
+}
+
 func WithPrettyLogger(w io.Writer) Option {
 	return func(l *Logger) {
 		if w == nil {

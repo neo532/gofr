@@ -10,6 +10,13 @@ import (
 
 type Option func(opt *Logger)
 
+func WithLogger(log *slog.Logger) Option {
+	return func(l *Logger) {
+		l.logger = log
+		return
+	}
+}
+
 func WithPrettyLogger(handler slog.Handler) Option {
 	return func(l *Logger) {
 		if handler == nil {

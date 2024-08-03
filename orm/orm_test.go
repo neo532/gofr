@@ -54,7 +54,7 @@ var (
 )
 
 func init() {
-	dsn := "user:passwd@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=true&loc=Local"
+	dsn := "root:12345678@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local"
 	d := &DefaultDBConf{
 		Read:        &DB{Name: "default_read", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
 		Write:       &DB{Name: "default_write", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
@@ -106,17 +106,17 @@ func TestTransaction(t *testing.T) {
 	//defer clean()
 
 	c := context.Background()
-	err := dbs.Transaction(c, func(ctx context.Context) (err error) {
+	err := dbs.Transaction(c, func(c context.Context) (err error) {
 
 		var databases []string
 
 		// Please notice this ctx not c.
-		if err = dbs.Write(ctx).Raw("show databases").Scan(&databases).Error; err != nil {
+		if err = dbs.Write(c).Raw("show databases").Scan(&databases).Error; err != nil {
 			return
 		}
 
 		// Please notice this ctx not c.
-		if err = dbs.Read(ctx).Raw("show databases").Scan(&databases).Error; err != nil {
+		if err = dbs.Read(c).Raw("show databases").Scan(&databases).Error; err != nil {
 			return
 		}
 		fmt.Println(fmt.Sprintf("txdbs:%+v", databases))
