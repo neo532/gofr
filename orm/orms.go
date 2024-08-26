@@ -87,9 +87,6 @@ func WithShadowWrite(dbs ...*Orm) OrmsOpt {
 
 func setDB(rs *DBs, o *Orms, dbs ...*Orm) {
 
-	rs.lock.Lock()
-	defer rs.lock.Unlock()
-
 	dbOldM := make(map[string]*Orm, len(rs.dbs))
 	for _, v := range rs.dbs {
 		dbOldM[v.Key()] = v
@@ -116,7 +113,11 @@ func setDB(rs *DBs, o *Orms, dbs ...*Orm) {
 		}
 	}
 	if ok {
+
+		rs.lock.Lock()
 		rs.dbs = dbNew
+		defer rs.lock.Unlock()
+
 		for _, v := range dbOldM {
 			cleanUp(v)
 		}
