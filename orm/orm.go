@@ -8,7 +8,10 @@ package orm
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,30 +30,34 @@ var (
 
 // ========== Option ==========
 type gormOpt struct {
-	schema schema.NamingStrategy
+	schema schema.NamingStrategy `json:"schema"`
 }
 
 type Opt func(*Orm)
 
-func WithMaxIdleConns(i int) Opt {
+func WithMaxIdleConns(i int32) Opt {
 	return func(o *Orm) {
-		o.opts = append(o.opts, func(db *sql.DB) {
-			db.SetMaxIdleConns(i)
+		o.Opts = append(o.Opts, func(db *sql.DB) {
+			db.SetMaxIdleConns(int(i))
 		})
+		o.OptsHash["SetMaxIdleConns"] = i
 	}
 }
-func WithMaxOpenConns(i int) Opt {
+func WithMaxOpenConns(i int32) Opt {
 	return func(o *Orm) {
-		o.opts = append(o.opts, func(db *sql.DB) {
-			db.SetMaxOpenConns(i)
+		o.Opts = append(o.Opts, func(db *sql.DB) {
+			db.SetMaxOpenConns(int(i))
 		})
+		o.OptsHash["SetMaxOpenConns"] = i
 	}
 }
 func WithConnMaxLifetime(t time.Duration) Opt {
 	return func(o *Orm) {
-		o.opts = append(o.opts, func(db *sql.DB) {
+		o.Opts = append(o.Opts, func(db *sql.DB) {
 			db.SetConnMaxLifetime(t)
+			o.ConnMaxLifetime = t
 		})
+		o.OptsHash["SetConnMaxLifetime"] = t
 	}
 }
 func WithRecordNotFoundError(b bool) Opt {
@@ -65,7 +72,7 @@ func WithSlowLog(t time.Duration) Opt {
 }
 func WithTablePrefix(s string) Opt {
 	return func(o *Orm) {
-		o.gormOpt.schema.TablePrefix = s
+		o.GormOpt.schema.TablePrefix = s
 	}
 }
 func WithLogger(l Logger) Opt {
@@ -75,7 +82,7 @@ func WithLogger(l Logger) Opt {
 }
 func WithSingularTable() Opt {
 	return func(o *Orm) {
-		o.gormOpt.schema.SingularTable = true
+		o.GormOpt.schema.SingularTable = true
 	}
 }
 func WithContext(c context.Context) Opt {
@@ -86,14 +93,18 @@ func WithContext(c context.Context) Opt {
 
 // ========== /Option ==========
 type Orm struct {
-	orm              *gorm.DB
-	cleanup          func()
-	err              error
-	bootstrapContext context.Context
+	orm              *gorm.DB        `json:"-"`
+	close            func()          `json:"-"`
+	err              error           `json:"-"`
+	bootstrapContext context.Context `json:"-"`
+	ConnMaxLifetime  time.Duration   `json:"-"`
 
-	gormLogger *gormLogger
-	gormOpt    *gormOpt
-	opts       []func(db *sql.DB)
+	gormLogger *gormLogger            `json:"-"`
+	GormOpt    *gormOpt               `json:"gormOpt"`
+	Opts       []func(db *sql.DB)     `json:"-"`
+	OptsHash   map[string]interface{} `json:"optsHash"`
+
+	key string `json:"-"`
 }
 
 // New returns a instance of Orm.
@@ -102,28 +113,38 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 	instanceLock.Lock()
 	defer instanceLock.Unlock()
 
-	var ok bool
-	if db, ok = ormMap[name]; ok {
-		return
-	}
-
 	db = &Orm{
 		bootstrapContext: context.Background(),
-		gormOpt: &gormOpt{
+		GormOpt: &gormOpt{
 			schema: schema.NamingStrategy{},
 		},
-		gormLogger: &gormLogger{name: name, logger: NewDefaultLogger()},
-		opts:       make([]func(db *sql.DB), 0),
+		gormLogger:      &gormLogger{name: name, logger: NewDefaultLogger()},
+		Opts:            make([]func(db *sql.DB), 0),
+		ConnMaxLifetime: 3 * time.Second,
+		OptsHash:        make(map[string]interface{}, 3),
+		key:             name,
 	}
 	for _, o := range opts {
 		o(db)
+	}
+
+	if b, e := json.Marshal(db); e == nil {
+		db.key += ":" + fmt.Sprintf("%x", md5.Sum(b))
+	}
+	if b, e := json.Marshal(dsn); e == nil {
+		db.key += ":" + fmt.Sprintf("%x", md5.Sum(b))
+	}
+
+	if odb, ok := ormMap[db.key]; ok {
+		db = odb
+		return
 	}
 
 	db.orm, db.err = gorm.Open(
 		dsn,
 		&gorm.Config{
 			Logger:         db.gormLogger,
-			NamingStrategy: db.gormOpt.schema,
+			NamingStrategy: db.GormOpt.schema,
 			ClauseBuilders: map[string]clause.ClauseBuilder{
 				//hints.Comment("select", "master"),
 			},
@@ -141,11 +162,16 @@ func New(name string, dsn gorm.Dialector, opts ...Opt) (db *Orm) {
 		db.LogError(name, "Orm DB has error")
 		return
 	}
-	for _, o := range db.opts {
+	for _, o := range db.Opts {
 		o(sqlDB)
 	}
 
-	db.cleanup = func() {
+	if db.err = sqlDB.Ping(); db.err != nil {
+		db.LogError(name, "Orm DB has error")
+		return
+	}
+
+	db.close = func() {
 		if sqlDB == nil {
 			db.LogError(name, "Close db is nil!")
 			return
@@ -167,12 +193,16 @@ func (o *Orm) Error() error {
 	return o.err
 }
 
+func (o *Orm) Key() string {
+	return o.key
+}
+
 func (o *Orm) Orm() *gorm.DB {
 	return o.orm
 }
 
-func (o *Orm) Cleanup() func() {
-	return o.cleanup
+func (o *Orm) Close() func() {
+	return o.close
 }
 
 type gormLogger struct {

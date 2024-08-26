@@ -28,7 +28,7 @@ func Connect(c context.Context, cfg *OrmConfig, dsn *DsnConfig, logger Logger) *
 	)
 }
 
-func NewOrms(c context.Context, d *OrmConfig, logger Logger) (dbs *Orms, clean func(), err error) {
+func NewOrms(c context.Context, d *OrmConfig, logger Logger) (dbs *Orms, close func(), err error) {
 	opts := make([]OrmsOpt, 0, 4)
 	if d.Read != nil {
 		for _, dsn := range d.Read {
@@ -51,6 +51,6 @@ func NewOrms(c context.Context, d *OrmConfig, logger Logger) (dbs *Orms, clean f
 		}
 	}
 	dbs = News(opts...)
-	clean = dbs.Cleanup()
+	close = dbs.Close()
 	return
 }

@@ -19,6 +19,10 @@ func NewDefaultLogger(l ILogger) Logger {
 	}
 }
 
+func (l *DefaultLogger) Close() (err error) {
+	return l.log.Close()
+}
+
 func (l *DefaultLogger) WithArgs(kvs ...interface{}) (n Logger) {
 	return &DefaultLogger{
 		log:        l.log,

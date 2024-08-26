@@ -14,8 +14,8 @@ type DsnConfig struct {
 }
 
 type OrmConfig struct {
-	MaxOpenConns        int           `yaml:"max_open_conns"`
-	MaxIdleConns        int           `yaml:"max_idle_conns"`
+	MaxOpenConns        int32         `yaml:"max_open_conns"`
+	MaxIdleConns        int32         `yaml:"max_idle_conns"`
 	ConnMaxLifetime     time.Duration `yaml:"conn_max_lifetime"`
 	MaxSlowtime         time.Duration `yaml:"max_slowtime"`
 	TablePrefix         string        `yaml:"table_prefix"`

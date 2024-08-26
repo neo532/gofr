@@ -8,13 +8,13 @@ import (
 	"github.com/neo532/gofr/logger"
 )
 
-func createLog() (h *logger.Logger) {
+func createLog() (h logger.Logger) {
 	cp := func(c context.Context) (key string, value interface{}) {
 		return "aa", "bbbbbbbbb"
 	}
 	cp(context.Background())
 
-	l, err := New(
+	l := New(
 		WithFilename("./test.log"),
 		WithMaxBackups(2),
 		WithMaxSize(2),
@@ -24,10 +24,10 @@ func createLog() (h *logger.Logger) {
 		WithCallerSkip(2),
 		//WithPrettyLogger(nil),
 	)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("err:\t%+v", err))
+	if l.err != nil {
+		fmt.Println(fmt.Sprintf("err:\t%+v", l.err))
 	}
-	return logger.NewLogger(l)
+	return logger.NewDefaultLogger(l)
 }
 func TestLogger(t *testing.T) {
 
@@ -44,6 +44,6 @@ func TestLogger(t *testing.T) {
 	a(c, h)
 }
 
-func a(c context.Context, h *logger.Logger) {
+func a(c context.Context, h logger.Logger) {
 	h.WithArgs(logger.LogkeyModule, "m3").Errorf(c, "kkkk%s", "cc")
 }

@@ -14,16 +14,16 @@ import (
 )
 
 type Pooler interface {
-	Choose(c context.Context, dbs []*gorm.DB) *gorm.DB
+	Choose(c context.Context, dbs *DBs) *gorm.DB
 }
 
 type RandomPolicy struct {
 }
 
-func (*RandomPolicy) Choose(c context.Context, dbs []*gorm.DB) *gorm.DB {
-	l := len(dbs)
+func (*RandomPolicy) Choose(c context.Context, dbs *DBs) *gorm.DB {
+	l := len(dbs.dbs)
 	if l == 1 {
-		return dbs[0]
+		return dbs.dbs[0].Orm()
 	}
-	return dbs[rand.Intn(l)]
+	return dbs.dbs[rand.Intn(l)].Orm()
 }

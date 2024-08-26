@@ -6,6 +6,7 @@ import (
 
 type ILogger interface {
 	Log(c context.Context, level Level, message string, kvs ...interface{}) error
+	Close() error
 }
 
 type ILoggerArgs func(c context.Context) (k string, v interface{})
@@ -13,6 +14,7 @@ type ILoggerArgs func(c context.Context) (k string, v interface{})
 type Logger interface {
 	WithArgs(kvs ...interface{}) (n Logger)
 	WithLevel(lv Level) (n Logger)
+	Close() error
 
 	Debugf(c context.Context, format string, kvs ...interface{})
 	Warnf(c context.Context, format string, kvs ...interface{})

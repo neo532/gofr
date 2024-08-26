@@ -33,7 +33,7 @@ func createLog() (h logger.Logger) {
 	cp(context.Background())
 	sp(context.Background())
 
-	l, err := New(
+	l := New(
 		WithFilename("./test.log"),
 		WithMaxBackups(2),
 		WithMaxSize(2),
@@ -43,8 +43,8 @@ func createLog() (h logger.Logger) {
 		WithReplaceAttr(func() (k string, v interface{}) { return "msg", "" }),
 		WithPrettyLogger(nil),
 	)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("err:\t%+v", err))
+	if l.err != nil {
+		fmt.Println(fmt.Sprintf("err:\t%+v", l.err))
 	}
 	return logger.NewDefaultLogger(l)
 }

@@ -70,6 +70,7 @@ func WithLevel(lv string) Option {
 		var err error
 		if l.levelEnabler, err = zapcore.ParseLevel(lv); err != nil {
 			l.err = err
+			return
 		}
 	}
 }

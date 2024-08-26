@@ -53,32 +53,41 @@ var (
 	clean func()
 )
 
-func init() {
+func getConfig() (d *DefaultDBConf) {
 	dsn := "root:12345678@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=true&loc=Local"
-	d := &DefaultDBConf{
+	d = &DefaultDBConf{
 		Read:        &DB{Name: "default_read", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
 		Write:       &DB{Name: "default_write", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
 		ShadowRead:  &DB{Name: "default_shadowread", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
 		ShadowWrite: &DB{Name: "default_shadowwrite", Dsn: dsn, ConnMaxLifetime: 3 * time.Second, MaxIdleConns: 2, MaxOpenConns: 2, MaxSlowtime: 3 * time.Second},
 	}
+	return
+}
+
+func init() {
 	logger := NewDefaultLogger()
 	c := context.Background()
+	var opts []OrmsOpt
+	var d *DefaultDBConf
 
-	opts := make([]OrmsOpt, 0, 4)
-	if d.Read != nil {
-		opts = append(opts, WithRead(connect(c, d.Read, logger)))
-	}
-	if d.Write != nil {
-		opts = append(opts, WithWrite(connect(c, d.Write, logger)))
-	}
-	if d.ShadowRead != nil {
-		opts = append(opts, WithShadowRead(connect(c, d.ShadowRead, logger)))
-	}
-	if d.ShadowWrite != nil {
-		opts = append(opts, WithShadowWrite(connect(c, d.ShadowWrite, logger)))
+	d = getConfig()
+	opts = []OrmsOpt{
+		WithRead(connect(c, d.Read, logger)),
+		WithWrite(connect(c, d.Write, logger)),
+		WithShadowRead(connect(c, d.ShadowRead, logger)),
+		WithShadowWrite(connect(c, d.ShadowWrite, logger)),
 	}
 	dbs = News(opts...)
-	clean = dbs.Cleanup()
+
+	d = getConfig()
+	opts = []OrmsOpt{
+		WithRead(connect(c, d.Read, logger)),
+		WithWrite(connect(c, d.Write, logger)),
+		WithShadowRead(connect(c, d.ShadowRead, logger)),
+		WithShadowWrite(connect(c, d.ShadowWrite, logger)),
+	}
+	dbs.With(opts...)
+	clean = dbs.Close()
 }
 
 func TestOrms(t *testing.T) {
@@ -98,6 +107,7 @@ func TestOrms(t *testing.T) {
 		t.Errorf("%s has err[%+v]", t.Name(), err)
 	}
 	fmt.Println(fmt.Sprintf("dbs:%+v\t%+v", databases, err))
+	time.Sleep(10 * time.Second)
 }
 
 func TestTransaction(t *testing.T) {
@@ -110,12 +120,10 @@ func TestTransaction(t *testing.T) {
 
 		var databases []string
 
-		// Please notice this ctx not c.
 		if err = dbs.Write(c).Raw("show databases").Scan(&databases).Error; err != nil {
 			return
 		}
 
-		// Please notice this ctx not c.
 		if err = dbs.Read(c).Raw("show databases").Scan(&databases).Error; err != nil {
 			return
 		}

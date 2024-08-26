@@ -9,6 +9,8 @@ package orm
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -16,16 +18,20 @@ import (
 type contextTransactionKey struct{}
 
 type Orms struct {
-	read        []*gorm.DB
-	write       []*gorm.DB
-	shadowRead  []*gorm.DB
-	shadowWrite []*gorm.DB
+	read        *DBs
+	write       *DBs
+	shadowRead  *DBs
+	shadowWrite *DBs
 
 	pooler      Pooler
 	benchmarker Benchmarker
 
-	cleanupFuncs []func()
-	err          error
+	err error
+}
+
+type DBs struct {
+	dbs  []*Orm
+	lock sync.RWMutex
 }
 
 // ========== OrmsOpt =========
@@ -43,48 +49,93 @@ func WithPooler(fn Pooler) OrmsOpt {
 	}
 }
 
-func WithRead(reads ...*Orm) OrmsOpt {
+func WithRead(dbs ...*Orm) OrmsOpt {
 	return func(o *Orms) {
-		if len(reads) == 0 {
-			return
+		if o.read == nil {
+			o.read = &DBs{}
 		}
-		for _, db := range reads {
-			o.read = append(o.read, o.setDB(db))
-		}
+		setDB(o.read, o, dbs...)
 	}
 }
 
-func WithWrite(writes ...*Orm) OrmsOpt {
+func WithWrite(dbs ...*Orm) OrmsOpt {
 	return func(o *Orms) {
-		if len(writes) == 0 {
-			return
+		if o.write == nil {
+			o.write = &DBs{}
 		}
-		for _, db := range writes {
-			o.write = append(o.write, o.setDB(db))
-		}
+		setDB(o.write, o, dbs...)
 	}
 }
 
-func WithShadowRead(reads ...*Orm) OrmsOpt {
+func WithShadowRead(dbs ...*Orm) OrmsOpt {
 	return func(o *Orms) {
-		if len(reads) == 0 {
-			return
+		if o.shadowRead == nil {
+			o.shadowRead = &DBs{}
 		}
-		for _, db := range reads {
-			o.shadowRead = append(o.shadowRead, o.setDB(db))
-		}
+		setDB(o.shadowRead, o, dbs...)
 	}
 }
 
-func WithShadowWrite(writes ...*Orm) OrmsOpt {
+func WithShadowWrite(dbs ...*Orm) OrmsOpt {
 	return func(o *Orms) {
-		if len(writes) == 0 {
-			return
+		if o.shadowWrite == nil {
+			o.shadowWrite = &DBs{}
 		}
-		for _, db := range writes {
-			o.shadowWrite = append(o.shadowWrite, o.setDB(db))
+		setDB(o.shadowWrite, o, dbs...)
+	}
+}
+
+func setDB(rs *DBs, o *Orms, dbs ...*Orm) {
+
+	rs.lock.Lock()
+	defer rs.lock.Unlock()
+
+	dbOldM := make(map[string]*Orm, len(rs.dbs))
+	for _, v := range rs.dbs {
+		dbOldM[v.Key()] = v
+	}
+
+	dbNew := make([]*Orm, 0, len(dbs))
+
+	var ok bool
+	for _, db := range dbs {
+
+		if err := db.Error(); err != nil {
+			o.err = err
+			continue
+		}
+
+		if _, ok := dbOldM[db.Key()]; ok {
+			delete(dbOldM, db.Key())
+		}
+
+		dbNew = append(dbNew, db)
+
+		if !ok {
+			ok = true
 		}
 	}
+	if ok {
+		rs.dbs = dbNew
+		for _, v := range dbOldM {
+			cleanUp(v)
+		}
+	}
+	return
+}
+
+func cleanUp(os ...*Orm) (err error) {
+	for _, o := range os {
+		t := time.NewTimer(
+			time.Duration(int(o.ConnMaxLifetime.Seconds())+1) * time.Second,
+		)
+		go func() {
+			<-t.C
+			o.Close()
+		}()
+	}
+
+	return
 }
 
 // ========== /OrmsOpt =========
@@ -94,13 +145,23 @@ func News(opts ...OrmsOpt) (dbs *Orms) {
 		benchmarker: &DefaultBenchmarker{},
 		pooler:      &RandomPolicy{},
 	}
-	for _, opt := range opts {
-		opt(dbs)
-	}
-	if dbs.write == nil && dbs.read == nil {
-		dbs.err = errors.New("Please input a instance at least")
-	}
+	dbs.With(opts...)
 	return
+}
+
+func (m *Orms) With(opts ...OrmsOpt) {
+	for _, opt := range opts {
+		opt(m)
+	}
+	if m.write == nil && m.read == nil {
+		m.err = errors.New("Please input a instance at least")
+	}
+}
+
+func (m *Orms) get(c context.Context, dbs *DBs) (db *gorm.DB) {
+	dbs.lock.RLock()
+	defer dbs.lock.RUnlock()
+	return m.pooler.Choose(c, dbs).WithContext(c)
 }
 
 func (m *Orms) Read(c context.Context) (db *gorm.DB) {
@@ -109,14 +170,14 @@ func (m *Orms) Read(c context.Context) (db *gorm.DB) {
 	}
 	if m.benchmarker.Judge(c) {
 		if m.shadowRead == nil {
-			return m.pooler.Choose(c, m.shadowWrite).WithContext(c)
+			return m.get(c, m.shadowWrite)
 		}
-		return m.pooler.Choose(c, m.shadowRead).WithContext(c)
+		return m.get(c, m.shadowRead)
 	}
 	if m.read == nil {
-		return m.pooler.Choose(c, m.write).WithContext(c)
+		return m.get(c, m.write)
 	}
-	return m.pooler.Choose(c, m.read).WithContext(c)
+	return m.get(c, m.read)
 }
 
 func (m *Orms) Write(c context.Context) (db *gorm.DB) {
@@ -125,14 +186,14 @@ func (m *Orms) Write(c context.Context) (db *gorm.DB) {
 	}
 	if m.benchmarker.Judge(c) {
 		if m.shadowWrite == nil {
-			return m.pooler.Choose(c, m.shadowRead).WithContext(c)
+			return m.get(c, m.shadowRead)
 		}
-		return m.pooler.Choose(c, m.shadowWrite).WithContext(c)
+		return m.get(c, m.shadowWrite)
 	}
 	if m.write == nil {
-		return m.pooler.Choose(c, m.read).WithContext(c)
+		return m.get(c, m.read)
 	}
-	return m.pooler.Choose(c, m.write).WithContext(c)
+	return m.get(c, m.write)
 }
 
 func (m *Orms) Transaction(c context.Context, fn func(c context.Context) (err error)) error {
@@ -144,20 +205,21 @@ func (m *Orms) Transaction(c context.Context, fn func(c context.Context) (err er
 	})
 }
 
-func (m *Orms) Cleanup() func() {
+func (m *Orms) Close() func() {
 	return func() {
-		for _, fn := range m.cleanupFuncs {
-			fn()
+		for _, o := range m.read.dbs {
+			o.Close()
+		}
+		for _, o := range m.write.dbs {
+			o.Close()
+		}
+		for _, o := range m.shadowRead.dbs {
+			o.Close()
+		}
+		for _, o := range m.shadowWrite.dbs {
+			o.Close()
 		}
 	}
-}
-
-func (m *Orms) setDB(db *Orm) *gorm.DB {
-	m.cleanupFuncs = append(m.cleanupFuncs, db.Cleanup())
-	if err := db.Error(); err != nil {
-		m.err = err
-	}
-	return db.Orm()
 }
 
 func (m *Orms) Error() error {

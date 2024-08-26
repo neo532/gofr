@@ -21,7 +21,7 @@ type Logger struct {
 	opts       *slog.HandlerOptions
 }
 
-func New(opts ...Option) (l *Logger, err error) {
+func New(opts ...Option) (l *Logger) {
 
 	l = &Logger{
 		paramGlobal:  make([]interface{}, 0, 2),
@@ -32,7 +32,7 @@ func New(opts ...Option) (l *Logger, err error) {
 	for _, o := range opts {
 		o(l)
 	}
-	if err = l.err; err != nil {
+	if l.err != nil {
 		return
 	}
 
@@ -48,6 +48,10 @@ func New(opts ...Option) (l *Logger, err error) {
 
 func (l *Logger) Opts() *slog.HandlerOptions {
 	return l.opts
+}
+
+func (l *Logger) Close() (err error) {
+	return l.syncerConf.Close()
 }
 
 func (l *Logger) ParamContext() []logger.ILoggerArgs {
@@ -74,4 +78,8 @@ func (l *Logger) Log(c context.Context, level logger.Level, message string, p ..
 	}
 
 	return
+}
+
+func (l *Logger) Err() (err error) {
+	return l.err
 }

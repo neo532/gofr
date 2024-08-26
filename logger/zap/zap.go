@@ -8,6 +8,7 @@ package zap
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -34,7 +35,7 @@ type Logger struct {
 	Sync func() error
 }
 
-func New(opts ...Option) (l *Logger, err error) {
+func New(opts ...Option) (l *Logger) {
 	l = &Logger{
 		paramGlobal:  make([]interface{}, 0, 2),
 		paramContext: make([]logger.ILoggerArgs, 0, 2),
@@ -53,7 +54,7 @@ func New(opts ...Option) (l *Logger, err error) {
 	for _, o := range opts {
 		o(l)
 	}
-	if err = l.err; err != nil {
+	if l.err != nil {
 		return
 	}
 
@@ -98,5 +99,21 @@ func (l *Logger) Log(c context.Context, level logger.Level, message string, p ..
 	case logger.LevelFatal:
 		l.logger.Log(zapcore.FatalLevel, message, ps...)
 	}
-	return nil
+	return
+}
+
+func (l *Logger) Close() (err error) {
+	err = l.logger.Sync()
+	if er := l.syncerConf.Close(); er != nil {
+		if err != nil {
+			err = errors.Wrap(err, er.Error())
+			return
+		}
+		err = er
+	}
+	return
+}
+
+func (l *Logger) Err() (err error) {
+	return l.err
 }
