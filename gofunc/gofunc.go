@@ -118,9 +118,10 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 		return
 	}
 
+	timer := time.After(ts)
 	for {
 		select {
-		case <-time.After(ts):
+		case <-timer:
 			g.log.Error(c, errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts))
 			return
 		case n := <-finish:
