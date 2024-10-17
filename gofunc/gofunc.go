@@ -115,21 +115,20 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 			defer wg.Done()
 
 			for {
-				select {
-				case index := <-task:
-					switch index {
-					case TaskStatusTimeout, TaskStatusProducer, TaskStatusEnd:
-						return
-					}
-					defer func() {
-						if r := recover(); r != nil {
-							g.log.Error(c,
-								errors.Errorf("[%dth][%+v][%s]", index, r, string(debug.Stack())),
-							)
-						}
-					}()
-					fns[index](index)
+				index := <-task
+
+				switch index {
+				case TaskStatusTimeout, TaskStatusProducer, TaskStatusEnd:
+					return
 				}
+				defer func() {
+					if r := recover(); r != nil {
+						g.log.Error(c,
+							errors.Errorf("[%dth][%+v][%s]", index, r, string(debug.Stack())),
+						)
+					}
+				}()
+				fns[index](index)
 			}
 		}()
 	}
