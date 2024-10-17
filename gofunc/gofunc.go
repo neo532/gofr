@@ -9,12 +9,17 @@ package gofunc
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+)
+
+const (
+	TaskStatusEnd      = -1
+	TaskStatusTimeout  = -2
+	TaskStatusProducer = -3
 )
 
 // GoFunc is a function for a goroutine.
@@ -54,87 +59,82 @@ func NewGoFunc(opts ...opt) *GoFunc {
 }
 
 func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(i int) error) {
+
 	l := len(fns)
 	lRunning := g.maxGoroutine
 	if l < lRunning {
 		lRunning = l
 	}
 
-	running := make(chan int, lRunning)
-	finish := make(chan int, l)
-	closeChan := func() {
-		close(running)
-		close(finish)
-	}
+	var wg sync.WaitGroup
+	wg.Add(lRunning + 1)
+	task := make(chan int)
 
-	go func() {
-		if r := recover(); r != nil {
-			g.log.Error(
-				c,
-				errors.Errorf("main[%+v][%s]", r, string(debug.Stack())),
-			)
-		}
-
-		var wg sync.WaitGroup
-		wg.Add(l)
-		for i := 0; i < l; i++ {
-			running <- i
-			go func(j int) {
-				defer func() {
-					if r := recover(); r != nil {
-						g.log.Error(
-							c,
-							errors.Errorf("[%dth][%+v][%s]", j, r, string(debug.Stack())),
-						)
-					}
-					finish <- j
-					wg.Done()
-				}()
-				if err := fns[j](j); err != nil {
-					g.log.Error(c, errors.Wrapf(err, "[%dth]", j))
-				}
-			}(i)
-		}
+	defer func() {
 		wg.Wait()
-		finish <- -1
-		closeChan()
+		close(task)
 	}()
 
-	if int(ts.Microseconds()) == 0 {
-		for {
-			select {
-			case n := <-finish:
-				if n == -1 {
-					return
-				} else {
-					<-running
-				}
-				g.log.Info(c, fmt.Sprintf("Finish %dth", n))
-			case <-c.Done():
-				g.log.Error(c, errors.Errorf("Main context has Done!"))
-				return
-			}
-		}
-		return
-	}
+	go func() {
+		taskStatus := TaskStatusEnd
 
-	timer := time.After(ts)
-	for {
-		select {
-		case <-timer:
-			g.log.Error(c, errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts))
-			return
-		case n := <-finish:
-			if n == -1 {
-				return
-			} else {
-				<-running
+		defer func() {
+			if r := recover(); r != nil {
+				taskStatus = TaskStatusProducer
+				g.log.Error(c,
+					errors.Errorf("[%dth][%+v][%s]", taskStatus, r, string(debug.Stack())),
+				)
 			}
-			g.log.Info(c, fmt.Sprintf("Finish %dth", n))
-		case <-c.Done():
-			g.log.Error(c, errors.Errorf("Main context has Done!"))
+			for j := 0; j < lRunning; j++ {
+				task <- taskStatus
+			}
+			wg.Done()
+		}()
+
+		if int(ts.Microseconds()) == 0 {
+			for i := 0; i < l; i++ {
+				task <- i
+			}
 			return
 		}
+
+		timer := time.After(ts)
+		for i := 0; i < l; i++ {
+			select {
+			case <-timer:
+				taskStatus = TaskStatusTimeout
+				g.log.Error(c,
+					errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts),
+				)
+				return
+			default:
+				task <- i
+			}
+		}
+	}()
+
+	for i := 0; i < lRunning; i++ {
+		go func() {
+			defer wg.Done()
+
+			for {
+				select {
+				case index := <-task:
+					switch index {
+					case TaskStatusTimeout, TaskStatusProducer, TaskStatusEnd:
+						return
+					}
+					defer func() {
+						if r := recover(); r != nil {
+							g.log.Error(c,
+								errors.Errorf("[%dth][%+v][%s]", index, r, string(debug.Stack())),
+							)
+						}
+					}()
+					fns[index](index)
+				}
+			}
+		}()
 	}
 }
 

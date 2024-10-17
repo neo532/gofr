@@ -7,7 +7,7 @@ triggers:
   - '**/*.py'
   env:
     DEBUG: "1"
-  cmd: go test
+  cmd: go test -run=TestWithTimeoutInN
   shell: true
   delay: 100ms
   stop_timeout: 500ms
