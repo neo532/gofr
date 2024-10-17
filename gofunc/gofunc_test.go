@@ -56,7 +56,10 @@ func TestWithTimeoutInN(t *testing.T) {
 	fn := func(i int) (err error) {
 		time.Sleep(time.Second * 3)
 		fmt.Println(fmt.Sprintf("%s\t:Biz run,%d", t.Name(), i))
-		//err = errors.New("aaaaaaa")
+		if i == 1 {
+			//err = errors.New("aaaaaaa")
+			//panic("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+		}
 		return
 	}
 
@@ -73,7 +76,7 @@ func TestWithTimeoutInN(t *testing.T) {
 
 	gofn.WithTimeout(
 		c,
-		time.Second*1,
+		time.Second*2,
 		fns...,
 	)
 	err := log.Err()

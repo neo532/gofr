@@ -17,9 +17,7 @@ import (
 )
 
 const (
-	TaskStatusEnd      = -1
-	TaskStatusTimeout  = -2
-	TaskStatusProducer = -3
+	taskStatusEnd = -1
 )
 
 // GoFunc is a function for a goroutine.
@@ -71,19 +69,18 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 	task := make(chan int)
 
 	go func() {
-		taskStatus := TaskStatusEnd
 
 		defer func() {
 			if r := recover(); r != nil {
-				taskStatus = TaskStatusProducer
 				g.log.Error(c,
-					errors.Errorf("[%dth][%+v][%s]", taskStatus, r, string(debug.Stack())),
+					errors.Errorf("[producer][%+v][%s]", r, string(debug.Stack())),
 				)
 			}
-			for j := 0; j < lRunning; j++ {
-				task <- taskStatus
+			for i := 0; i < lRunning; i++ {
+				task <- taskStatusEnd
 			}
 			wg.Done()
+			close(task)
 		}()
 
 		if int(ts.Microseconds()) == 0 {
@@ -99,7 +96,6 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 		for i := 0; i < l; i++ {
 			select {
 			case <-timer.C:
-				taskStatus = TaskStatusTimeout
 				g.log.Error(c,
 					errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts),
 				)
@@ -112,29 +108,32 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 
 	for i := 0; i < lRunning; i++ {
 		go func() {
-			defer wg.Done()
+			var index int
+			defer func() {
+				if r := recover(); r != nil {
+
+					g.log.Error(c,
+						errors.Errorf("[%dth][%+v][%s]", index, r, string(debug.Stack())),
+					)
+					// pop taskStatusEnd
+					<-task
+				}
+				wg.Done()
+			}()
 
 			for {
-				index := <-task
-
-				switch index {
-				case TaskStatusTimeout, TaskStatusProducer, TaskStatusEnd:
+				if index = <-task; index == taskStatusEnd {
 					return
 				}
-				defer func() {
-					if r := recover(); r != nil {
-						g.log.Error(c,
-							errors.Errorf("[%dth][%+v][%s]", index, r, string(debug.Stack())),
-						)
-					}
-				}()
-				fns[index](index)
+
+				if err := fns[index](index); err != nil {
+					g.log.Error(c, errors.Wrapf(err, "[%dth]", index))
+				}
 			}
 		}()
 	}
 
 	wg.Wait()
-	close(task)
 }
 
 // WithTimeout is a way that running groutine slice by limiting time is synchronized.
