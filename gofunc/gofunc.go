@@ -98,10 +98,12 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 			return
 		}
 
-		timer := time.After(ts)
+		timer := time.NewTimer(ts)
+		defer timer.Stop()
+
 		for i := 0; i < l; i++ {
 			select {
-			case <-timer:
+			case <-timer.C:
 				taskStatus = TaskStatusTimeout
 				g.log.Error(c,
 					errors.Errorf("Timeout!,goroutines faild to finish within the specified %v", ts),
