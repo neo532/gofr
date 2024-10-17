@@ -70,11 +70,6 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 	wg.Add(lRunning + 1)
 	task := make(chan int)
 
-	defer func() {
-		wg.Wait()
-		close(task)
-	}()
-
 	go func() {
 		taskStatus := TaskStatusEnd
 
@@ -138,6 +133,9 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 			}
 		}()
 	}
+
+	wg.Wait()
+	close(task)
 }
 
 // WithTimeout is a way that running groutine slice by limiting time is synchronized.
