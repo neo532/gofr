@@ -67,6 +67,7 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 	var wg sync.WaitGroup
 	wg.Add(lRunning + 1)
 	task := make(chan int)
+	defer close(task)
 
 	go func() {
 
@@ -80,7 +81,6 @@ func (g *GoFunc) goWithTimeout(c context.Context, ts time.Duration, fns ...func(
 				task <- taskStatusEnd
 			}
 			wg.Done()
-			close(task)
 		}()
 
 		if int(ts.Microseconds()) == 0 {
