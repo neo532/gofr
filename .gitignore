@@ -3,3 +3,5 @@ go.sum
 .fsw.yml
 .DS_Store
 *.log
+
+/protoc-gen-go-svc
