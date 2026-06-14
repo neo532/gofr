@@ -4,9 +4,8 @@
 package api
 
 import (
-	"context"
-
-	"github.com/neo532/gofr/transport"
+	context "context"
+	transport "github.com/neo532/gofr/transport"
 )
 
 // GreeterServer is the server API for helloworld.Greeter service.

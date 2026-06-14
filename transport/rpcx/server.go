@@ -7,7 +7,6 @@ import (
 	rpcxServer "github.com/smallnest/rpcx/server"
 
 	"github.com/neo532/gofr/middleware"
-	"github.com/neo532/gofr/transport"
 )
 
 // ServerOption configures the rpcx server.
@@ -101,21 +100,5 @@ func (s *Server) Stop(ctx context.Context) error {
 func RegisterServiceWith(s *Server, serviceName string, svr interface{}) {
 	if err := s.RegisterName(serviceName, svr, ""); err != nil {
 		panic("rpcx: RegisterName(" + serviceName + "): " + err.Error())
-	}
-}
-
-// RegisterService registers a transport.ServiceDesc onto the rpcx server.
-// Deprecated: use RegisterServiceWith and generated code.
-func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) {
-	for _, m := range desc.Methods {
-		fullMethod := "/" + desc.Name + "/" + m.Name
-		_ = fullMethod
-		srv.AddHandler(desc.Name, m.Name, func(ctx *rpcxServer.Context) error {
-			req := m.NewRequest()
-			if err := ctx.Bind(req); err != nil {
-				return err
-			}
-			return nil
-		})
 	}
 }

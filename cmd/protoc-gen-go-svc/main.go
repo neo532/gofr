@@ -77,6 +77,16 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 	g.P("package ", file.GoPackageName)
 	g.P()
 
+	// Register imports needed by the svc template
+	g.QualifiedGoIdent(protogen.GoIdent{
+		GoImportPath: "context",
+		GoName:       "Context",
+	})
+	g.QualifiedGoIdent(protogen.GoIdent{
+		GoImportPath: protogen.GoImportPath("github.com/neo532/gofr/transport"),
+		GoName:       "ServiceDesc",
+	})
+
 	var services []*serviceDesc
 	for _, svc := range file.Services {
 		sd := &serviceDesc{
@@ -120,6 +130,21 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		hg.P()
 		hg.P("package ", file.GoPackageName)
 		hg.P()
+
+		// Register the transport/http package import
+		hg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: protogen.GoImportPath("github.com/neo532/gofr/transport/http"),
+			GoName:       "Server",
+		})
+		hg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "reflect",
+			GoName:       "Type",
+		})
+		hg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "strings",
+			GoName:       "Index",
+		})
+
 		httpOutput := generateHTTP(string(file.GoPackageName), services)
 		for _, line := range splitLines(httpOutput) {
 			hg.P(line)
@@ -134,6 +159,32 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		gg.P()
 		gg.P("package ", file.GoPackageName)
 		gg.P()
+
+		// Register imports needed by the grpc template
+		gg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: protogen.GoImportPath("github.com/neo532/gofr/transport/grpc"),
+			GoName:       "Server",
+		})
+		gg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "reflect",
+			GoName:       "Type",
+		})
+		gg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "strings",
+			GoName:       "Index",
+		})
+		gg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "context",
+			GoName:       "Context",
+		})
+		// Register method request/reply type imports (e.g. emptypb.Empty)
+		for _, svc := range file.Services {
+			for _, method := range svc.Methods {
+				gg.QualifiedGoIdent(method.Input.GoIdent)
+				gg.QualifiedGoIdent(method.Output.GoIdent)
+			}
+		}
+
 		grpcOutput := generateGRPC(string(file.GoPackageName), services)
 		for _, line := range splitLines(grpcOutput) {
 			gg.P(line)
@@ -148,6 +199,36 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		rg.P()
 		rg.P("package ", file.GoPackageName)
 		rg.P()
+
+		// Register imports needed by the rpcx template
+		rg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: protogen.GoImportPath("github.com/neo532/gofr/transport/rpcx"),
+			GoName:       "Server",
+		})
+		rg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "reflect",
+			GoName:       "Type",
+		})
+		rg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "strings",
+			GoName:       "Index",
+		})
+		rg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: "context",
+			GoName:       "Context",
+		})
+		rg.QualifiedGoIdent(protogen.GoIdent{
+			GoImportPath: protogen.GoImportPath("google.golang.org/protobuf/proto"),
+			GoName:       "Merge",
+		})
+		// Register method request/reply type imports (e.g. emptypb.Empty)
+		for _, svc := range file.Services {
+			for _, method := range svc.Methods {
+				rg.QualifiedGoIdent(method.Input.GoIdent)
+				rg.QualifiedGoIdent(method.Output.GoIdent)
+			}
+		}
+
 		rpcxOutput := generateRPCX(string(file.GoPackageName), services)
 		for _, line := range splitLines(rpcxOutput) {
 			rg.P(line)

@@ -23,6 +23,7 @@ service Greeter {
 
 message HelloRequest {
   string name = 1;
+  int32 age = 2;
 }
 
 message HelloReply {

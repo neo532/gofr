@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
@@ -44,23 +45,26 @@ func (s *Server) Addr() string {
 // NewServer creates a gRPC server.
 func NewServer(address string, opts ...grpc.ServerOption) *Server {
 	s := &Server{
-		Server:    grpc.NewServer(opts...),
 		address:   address,
 		mwManager: newMiddlewareManager(),
 	}
+	opts = append([]grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(unaryServerInterceptor(s)),
+	}, opts...)
+	s.Server = grpc.NewServer(opts...)
 	return s
 }
 
 // NewServerWith creates a gRPC server with gofr options.
 func NewServerWith(address string, opts ...ServerOption) *Server {
 	s := &Server{
-		Server:    grpc.NewServer(),
 		address:   address,
 		mwManager: newMiddlewareManager(),
 	}
 	for _, o := range opts {
 		o(s)
 	}
+	s.Server = grpc.NewServer(grpc.ChainUnaryInterceptor(unaryServerInterceptor(s)))
 	return s
 }
 
@@ -72,6 +76,28 @@ func (s *Server) Use(m ...middleware.Middleware) {
 // UseWith registers middlewares scoped to a specific method path (e.g. "/helloworld.Greeter/SayHello").
 func (s *Server) UseWith(method string, m ...middleware.Middleware) {
 	s.mwManager.UseWith(method, m...)
+}
+
+// unaryServerInterceptor wraps the context with a Transporter carrying request/reply metadata.
+func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		incomingMD, _ := metadata.FromIncomingContext(ctx)
+		replyMD := make(metadata.MD)
+
+		tr := &Transport{
+			endpoint:    s.address,
+			operation:   info.FullMethod,
+			reqHeader:   headerCarrier(incomingMD),
+			replyHeader: headerCarrier(replyMD),
+		}
+
+		// Pre-register reply headers so modifications via Tr.ReplyHeader() are
+		// automatically sent with the response.
+		_ = grpc.SetHeader(ctx, replyMD)
+
+		ctx = transport.NewServerContext(ctx, tr)
+		return handler(ctx, req)
+	}
 }
 
 // PrebuildHandler pre-computes middleware chain for a gRPC method.
@@ -158,7 +184,7 @@ func RegisterServiceWith(s *Server, serviceName string, svr interface{}, methods
 }
 
 // RegisterService registers a service from transport.ServiceDesc onto the gRPC server.
-// Deprecated: use RegisterServiceWith and generated _grpc.pb.go for zero-reflection.
+// MethodByName runs at registration time (startup), not per-request — only reflect.Call remains.
 func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) {
 	grpcDesc := &grpc.ServiceDesc{
 		ServiceName: desc.Name,
@@ -167,6 +193,14 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 	for _, m := range desc.Methods {
 		md := m
 		fullMethod := fmt.Sprintf("/%s/%s", desc.Name, md.Name)
+
+		// Pre-resolve method at startup — no per-request MethodByName.
+		srvVal := reflect.ValueOf(svr)
+		method := srvVal.MethodByName(md.Name)
+		if !method.IsValid() {
+			panic(fmt.Sprintf("gofr: service %q has no method %q", desc.Name, md.Name))
+		}
+
 		grpcDesc.Methods = append(grpcDesc.Methods, grpc.MethodDesc{
 			MethodName: md.Name,
 			Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -180,23 +214,18 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 						FullMethod: fullMethod,
 					}
 					return interceptor(ctx, req, info, func(ctx context.Context, req interface{}) (interface{}, error) {
-						return callMethod(srv, ctx, req, md.Name)
+						return callMethod(method, ctx, req)
 					})
 				}
-				return callMethod(srv, ctx, req, md.Name)
+				return callMethod(method, ctx, req)
 			},
 		})
 	}
 	srv.Server.RegisterService(grpcDesc, svr)
 }
 
-// callMethod uses reflection to dispatch. Retained for backward compatibility only.
-func callMethod(srv interface{}, ctx context.Context, req interface{}, name string) (interface{}, error) {
-	srvVal := reflect.ValueOf(srv)
-	method := srvVal.MethodByName(name)
-	if !method.IsValid() {
-		return nil, fmt.Errorf("gofr: service has no method %q", name)
-	}
+// callMethod dispatches with a pre-resolved method value — no MethodByName at request time.
+func callMethod(method reflect.Value, ctx context.Context, req interface{}) (interface{}, error) {
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(ctx),
 		reflect.ValueOf(req),

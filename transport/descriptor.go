@@ -12,10 +12,8 @@ type MethodDesc struct {
 	// NewRequest creates a new empty request value.
 	NewRequest func() interface{}
 	// HTTPMethod is optional HTTP method override (e.g. "GET", "POST").
-	// Populated by protoc-gen-go-svc when the proto has google.api.http annotation.
 	HTTPMethod string
 	// HTTPPath is optional HTTP path override (e.g. "/api/v1/hello/{name}").
-	// Populated by protoc-gen-go-svc when the proto has google.api.http annotation.
 	HTTPPath string
 }
 

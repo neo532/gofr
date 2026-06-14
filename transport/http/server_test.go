@@ -151,7 +151,7 @@ func TestToHTTPRouterPath(t *testing.T) {
 }
 
 func TestSnakeToPascal(t *testing.T) {
-	tests := []struct{ in, want string}{
+	tests := []struct{ in, want string }{
 		{"name", "Name"},
 		{"user_id", "UserId"},
 		{"hello_world_test", "HelloWorldTest"},
@@ -208,5 +208,59 @@ func TestServerMiddleware(t *testing.T) {
 
 	if !logged {
 		t.Fatal("middleware was not called")
+	}
+}
+
+func TestRegisterHandler(t *testing.T) {
+	srv := NewServer(Address(":0"))
+	RegisterHandler(srv, "test.Greeter/SayHello", (&testService{}).SayHello)
+
+	addr, stop := startServer(t, srv)
+	defer stop()
+
+	resp, err := http.Post(
+		"http://"+addr+"/test.Greeter/SayHello",
+		"application/json",
+		strings.NewReader(`{"name":"World"}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var reply helloReply
+	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message != "Hello World" {
+		t.Fatalf("got %q, want %q", reply.Message, "Hello World")
+	}
+}
+
+func TestRegisterUnary(t *testing.T) {
+	srv := NewServer(Address(":0"))
+	RegisterUnary(srv, "GET", "/api/v1/hello/:name",
+		(&testService{}).SayHello,
+		func(ctx Context, req *helloReq) error {
+			req.Name = ctx.PathValue("name")
+			return nil
+		},
+	)
+
+	addr, stop := startServer(t, srv)
+	defer stop()
+
+	resp, err := http.Get("http://" + addr + "/api/v1/hello/World")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var reply helloReply
+	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message != "Hello World" {
+		t.Fatalf("got %q, want %q", reply.Message, "Hello World")
 	}
 }

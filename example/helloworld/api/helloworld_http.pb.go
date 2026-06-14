@@ -3,7 +3,9 @@
 
 package api
 
-import "github.com/neo532/gofr/transport/http"
+import (
+	http "github.com/neo532/gofr/transport/http"
+)
 
 func _registerGreeterHTTP(s *http.Server, svr GreeterServer) {
 	http.RegisterUnary(s, "POST", "/api/v1/greeter", svr.SayHello, func(ctx http.Context, req *HelloRequest) error {

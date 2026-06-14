@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -57,7 +58,7 @@ func ErrorEncoder(ene EncodeErrorFunc) ServerOption {
 // Server is an HTTP server wrapper based on httprouter.
 type Server struct {
 	router    *httprouter.Router
-	srv       *http.Server
+	srv       atomic.Value // *http.Server, set in Start()
 	address   string
 	timeout   time.Duration
 	tlsConf   *tls.Config
@@ -185,22 +186,23 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.lis = lis
 
-	s.srv = &http.Server{
+	srv := &http.Server{
 		Addr:        s.address,
 		Handler:     s.router,
 		TLSConfig:   s.tlsConf,
 		ReadTimeout: s.timeout,
 	}
+	s.srv.Store(srv)
 
 	go func() {
 		<-ctx.Done()
-		s.srv.Close()
+		srv.Close()
 	}()
 
 	if s.tlsConf != nil {
-		err = s.srv.ServeTLS(s.lis, "", "")
+		err = srv.ServeTLS(s.lis, "", "")
 	} else {
-		err = s.srv.Serve(s.lis)
+		err = srv.Serve(s.lis)
 	}
 	if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
 		return err
@@ -210,5 +212,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Stop implements transport.Server.
 func (s *Server) Stop(ctx context.Context) error {
-	return s.srv.Shutdown(ctx)
+	if srv, ok := s.srv.Load().(*http.Server); ok {
+		return srv.Shutdown(ctx)
+	}
+	return nil
 }

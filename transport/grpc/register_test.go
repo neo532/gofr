@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/encoding"
 
 	"github.com/neo532/gofr/transport"
 )
@@ -19,7 +19,7 @@ import (
 // JSON codec for gRPC tests (non-protobuf messages).
 type testCodec struct{}
 
-func (testCodec) Marshal(v any) ([]byte, error)  { return json.Marshal(v) }
+func (testCodec) Marshal(v any) ([]byte, error)      { return json.Marshal(v) }
 func (testCodec) Unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 func (testCodec) Name() string                       { return "json" }
 
@@ -41,7 +41,7 @@ func (s testSvc) SayHello(ctx context.Context, req *helloReq) (*helloReply, erro
 	return &helloReply{Message: "Hello " + req.Name}, nil
 }
 
-// testServiceDesc for backward compat test.
+// testServiceDesc for RegisterService backward-compat test.
 var testServiceDesc = &transport.ServiceDesc{
 	Name: "test.Greeter",
 	Methods: []transport.MethodDesc{

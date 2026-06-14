@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo532/gofr/core"
+	"github.com/neo532/gofr"
 	pb "github.com/neo532/gofr/example/helloworld/api"
 	"github.com/neo532/gofr/example/helloworld/service"
 	gogrpc "google.golang.org/grpc"
@@ -27,7 +27,7 @@ import (
 // JSON codec for gRPC test (non-protobuf messages handled via json).
 type testCodec struct{}
 
-func (testCodec) Marshal(v any) ([]byte, error)  { return json.Marshal(v) }
+func (testCodec) Marshal(v any) ([]byte, error)      { return json.Marshal(v) }
 func (testCodec) Unmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 func (testCodec) Name() string                       { return "json" }
 
@@ -47,10 +47,10 @@ func startApp(t *testing.T) (httpAddr, grpcAddr, rpcxAddr string, stop func()) {
 	pb.RegisterRPCXServer(rpcxSrv, srv)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	app := core.New(
-		core.Name("test"),
-		core.Context(ctx),
-		core.WithServer(httpSrv, grpcSrv, rpcxSrv),
+	app := gofr.New(
+		gofr.Name("test"),
+		gofr.Context(ctx),
+		gofr.Server(httpSrv, grpcSrv, rpcxSrv),
 	)
 
 	done := make(chan struct{})

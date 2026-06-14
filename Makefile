@@ -1,5 +1,10 @@
 # gofr framework tools
 
+MODULE := $(shell head -1 go.mod | cut -d' ' -f2)
+PROTO_DIR ?= example/helloworld/api
+PROTO_FILES := $(wildcard $(PROTO_DIR)/*.proto)
+THIRD_PARTY := third_party
+
 # Build protoc-gen-go-svc plugin
 .PHONY: plugin
 plugin:
@@ -8,17 +13,17 @@ plugin:
 # Generate code from proto files
 .PHONY: gen
 gen: plugin
-	protoc -I=. -I=third_party \
-	       --go_out=. --go_opt=module=github.com/neo532/gofr \
-	       --go-svc_out=. --go-svc_opt=module=github.com/neo532/gofr \
-	       example/helloworld/api/helloworld.proto
+	protoc -I=. -I=$(THIRD_PARTY) \
+	       --go_out=. --go_opt=module=$(MODULE) \
+	       --go-svc_out=. --go-svc_opt=module=$(MODULE) \
+	       $(PROTO_FILES)
 
 # Generate OpenAPI v2 specification
 .PHONY: openapi
 openapi:
-	protoc -I=. -I=third_party \
+	protoc -I=. -I=$(THIRD_PARTY) \
 	       --openapiv2_out=. \
-	       example/helloworld/api/helloworld.proto
+	       $(PROTO_FILES)
 
 # Generate everything (proto code + OpenAPI)
 .PHONY: all

@@ -92,7 +92,7 @@ One implementation, all transports.
 package main
 
 import (
-    "github.com/neo532/gofr/core"
+    "github.com/neo532/gofr"
     pb "github.com/neo532/gofr/example/helloworld/api"
     "github.com/neo532/gofr/example/helloworld/service"
     "github.com/neo532/gofr/transport/http"
@@ -108,10 +108,10 @@ func main() {
     grpcSrv := grpc.NewServer(":9000")
     pb.RegisterGRPCServer(grpcSrv, srv)
 
-    app := core.New(
-        core.Name("helloworld"),
-        core.Version("1.0.0"),
-        core.WithServer(httpSrv, grpcSrv),
+    app := gofr.New(
+        gofr.Name("helloworld"),
+        gofr.Version("1.0.0"),
+        gofr.Server(httpSrv, grpcSrv),
     )
     app.Run()
 }
@@ -131,7 +131,7 @@ protoc (proto file)
 Application:
   transport.Server (HTTP, gRPC, rpcx, WS)
     └─ generated Register*Server() binds your implementation
-       └─ core.New(Name, Version, WithServer(...))
+       └─ gofr.New(Name, Version, WithServer(...))
           └─ app.Run() → errgroup starts all servers ← OS signal triggers graceful shutdown
 ```
 
@@ -184,7 +184,7 @@ Middleware works identically across HTTP, gRPC, rpcx, and WebSocket.
 
 ## Lifecycle
 
-`core.App` manages all servers as a unified group:
+`gofr.App` manages all servers as a unified group:
 
 - Starts all servers concurrently via `errgroup`
 - Listens for OS signals (`SIGINT`, `SIGTERM`)

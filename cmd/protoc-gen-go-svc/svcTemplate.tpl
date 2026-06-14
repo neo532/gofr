@@ -1,12 +1,6 @@
-import (
-	"context"
-
-	"github.com/neo532/gofr/transport"
-)
-
 {{range .Services}}
-// {{.ServiceType}}Server is the server API for {{.ServiceName}} service.
-type {{.ServiceType}}Server interface {
+// {{.ServiceType}}Service is the server API for {{.ServiceName}} service.
+type {{.ServiceType}}Service interface {
 	{{- range .Methods}}
 	{{.Name}}(context.Context, *{{.Request}}) (*{{.Reply}}, error)
 	{{- end}}

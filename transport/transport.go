@@ -20,8 +20,9 @@ type Endpointer interface {
 type Kind string
 
 const (
-	KindHTTP Kind = "http"
-	KindGRPC Kind = "grpc"
+	KindHTTP      Kind = "http"
+	KindGRPC      Kind = "grpc"
+	KindRPCX      Kind = "rpcx"
 	KindWebSocket Kind = "ws"
 )
 
@@ -41,13 +42,15 @@ type Transporter interface {
 	ReplyHeader() Header
 }
 
-type serverTransportKey struct{}
+
+// ServerTransportKey is the context key for storing/retrieving Transporter.
+type ServerTransportKey struct{}
 
 func NewServerContext(ctx context.Context, tr Transporter) context.Context {
-	return context.WithValue(ctx, serverTransportKey{}, tr)
+	return context.WithValue(ctx, ServerTransportKey{}, tr)
 }
 
 func FromServerContext(ctx context.Context) (Transporter, bool) {
-	tr, ok := ctx.Value(serverTransportKey{}).(Transporter)
+	tr, ok := ctx.Value(ServerTransportKey{}).(Transporter)
 	return tr, ok
 }

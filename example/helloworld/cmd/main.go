@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/neo532/gofr/core"
+	gws "github.com/gorilla/websocket"
+	"github.com/neo532/gofr"
 	pb "github.com/neo532/gofr/example/helloworld/api"
 	"github.com/neo532/gofr/example/helloworld/service"
 	"github.com/neo532/gofr/transport/grpc"
 	"github.com/neo532/gofr/transport/http"
 	"github.com/neo532/gofr/transport/rpcx"
 	gofrws "github.com/neo532/gofr/transport/websocket"
-	gws "github.com/gorilla/websocket"
 )
 
 func main() {
@@ -49,10 +49,10 @@ func main() {
 	})
 
 	// ——— App lifecycle management ———
-	app := core.New(
-		core.Name("helloworld"),
-		core.Version("1.0.0"),
-		core.WithServer(httpSrv, grpcSrv, rpcxSrv, wsSrv),
+	app := gofr.New(
+		gofr.Name("helloworld"),
+		gofr.Version("1.0.0"),
+		gofr.Server(httpSrv, grpcSrv, rpcxSrv, wsSrv),
 	)
 	fmt.Println("servers starting on :8000 (HTTP), :9000 (gRPC), :10000 (rpcx), :11000 (WS)...")
 	if err := app.Run(); err != nil {

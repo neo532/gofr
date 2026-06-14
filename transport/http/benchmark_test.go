@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/neo532/gofr/middleware"
@@ -50,20 +49,6 @@ func BenchmarkGenericDispatch(b *testing.B) {
 	}
 }
 
-// BenchmarkReflectDispatch — reflect dispatch (reflect.MethodByName + Call)
-func BenchmarkReflectDispatch(b *testing.B) {
-	val := reflect.ValueOf(benchSvc)
-	method := val.MethodByName("Hello")
-	fastPath := buildFastHandler(method)
-
-	ctx := context.Background()
-	req := &benchReq{Name: "test"}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		fastPath(ctx, req)
-	}
-}
-
 // BenchmarkMiddleware2 — 2 empty middleware layers (pre-chained)
 func BenchmarkMiddleware2(b *testing.B) {
 	ctx := context.Background()
@@ -86,23 +71,3 @@ func BenchmarkMiddleware2(b *testing.B) {
 	}
 }
 
-// BenchmarkFullChain — full chain: middleware + reflect dispatch
-func BenchmarkFullChain(b *testing.B) {
-	val := reflect.ValueOf(benchSvc)
-	method := val.MethodByName("Hello")
-	fastPath := buildFastHandler(method)
-
-	mid := middleware.Chain(
-		func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) { return next(ctx, req) }
-		},
-	)
-	h := mid(fastPath)
-
-	ctx := context.Background()
-	req := &benchReq{Name: "test"}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		h(ctx, req)
-	}
-}
