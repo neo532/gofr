@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/neo532/gofr/middleware"
@@ -179,8 +180,21 @@ func injectPathParams(req interface{}, paramNames []string, ctx Context) {
 				continue
 			}
 		}
-		if f.Kind() == reflect.String {
+		switch f.Kind() {
+		case reflect.String:
 			f.SetString(pv)
+		case reflect.Int64, reflect.Int32, reflect.Int:
+			n, _ := strconv.ParseInt(pv, 10, 64)
+			f.SetInt(n)
+		case reflect.Uint64, reflect.Uint32, reflect.Uint:
+			n, _ := strconv.ParseUint(pv, 10, 64)
+			f.SetUint(n)
+		case reflect.Float64, reflect.Float32:
+			n, _ := strconv.ParseFloat(pv, 64)
+			f.SetFloat(n)
+		case reflect.Bool:
+			n, _ := strconv.ParseBool(pv)
+			f.SetBool(n)
 		}
 	}
 }

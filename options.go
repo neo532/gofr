@@ -30,7 +30,7 @@ type options struct {
 	afterStart  []func(context.Context) error
 	beforeStop  []func(context.Context) error
 	afterStop   []func(context.Context) error
-	//
+
 	// endpoints []*url.URL
 	// registrar        registry.Registrar
 	// registrarTimeout time.Duration
@@ -46,6 +46,10 @@ func Name(name string) Option {
 
 func Version(v string) Option {
 	return func(o *options) { o.version = v }
+}
+
+func Metadata(md map[string]string) Option {
+	return func(o *options) { o.metadata = md }
 }
 
 func Context(ctx context.Context) Option {

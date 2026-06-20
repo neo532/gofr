@@ -3,8 +3,10 @@ package gofr
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -97,4 +99,31 @@ func (a *App) Stop() error {
 	}
 	a.cancel()
 	return nil
+}
+
+func (a *App) WritePID(file string) (err error) {
+	p := strconv.Itoa(os.Getpid())
+	if file == "" {
+		file = "./pid"
+	}
+
+	var f *os.File
+	f, err = os.OpenFile(file, os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	defer func() {
+		if f != nil {
+			f.Close()
+		}
+	}()
+	if err != nil {
+		return
+	}
+	var n int
+	n, err = f.Write([]byte(p))
+	if err != nil {
+		return
+	}
+	if n < len(p) {
+		err = io.ErrShortWrite
+	}
+	return
 }

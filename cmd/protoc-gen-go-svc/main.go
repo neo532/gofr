@@ -180,8 +180,7 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		// Register method request/reply type imports (e.g. emptypb.Empty)
 		for _, svc := range file.Services {
 			for _, method := range svc.Methods {
-				gg.QualifiedGoIdent(method.Input.GoIdent)
-				gg.QualifiedGoIdent(method.Output.GoIdent)
+  				gg.QualifiedGoIdent(method.Input.GoIdent)				
 			}
 		}
 

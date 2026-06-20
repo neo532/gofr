@@ -16,7 +16,13 @@ func _register{{$svc.ServiceType}}GRPC(s *grpc.Server, svr {{$svc.ServiceType}}S
 
 // RegisterGRPCServer registers all services to the gRPC server.
 // It matches each svr to its service descriptor by the concrete type name.
+// Panics if any defined service is left unimplemented.
 func RegisterGRPCServer(s *grpc.Server, svrs ...interface{}) {
+	matched := map[string]bool{
+		{{- range $svc := .Services}}
+		"{{$svc.ServiceType}}": false,
+		{{- end}}
+	}
 	for _, svr := range svrs {
 		t := reflect.TypeOf(svr)
 		if t.Kind() == reflect.Ptr {
@@ -28,21 +34,28 @@ func RegisterGRPCServer(s *grpc.Server, svrs ...interface{}) {
 			switch svcName {
 			{{- range $svc := .Services}}
 			case "{{$svc.ServiceType}}":
+				matched["{{$svc.ServiceType}}"] = true
 				_register{{$svc.ServiceType}}GRPC(s, svr.({{$svc.ServiceType}}Service))
 			{{- end}}
 			default:
-				fallbackRegisterGRPC(s, svr)
+				fallbackRegisterGRPC(s, svr, matched)
 			}
 		} else {
-			fallbackRegisterGRPC(s, svr)
+			fallbackRegisterGRPC(s, svr, matched)
+		}
+	}
+	for svc, ok := range matched {
+		if !ok {
+			panic("gofr: gRPC service \"" + svc + "\" has no implementation")
 		}
 	}
 }
 
-func fallbackRegisterGRPC(s *grpc.Server, svr interface{}) {
+func fallbackRegisterGRPC(s *grpc.Server, svr interface{}, matched map[string]bool) {
 	switch v := svr.(type) {
 	{{- range $svc := .Services}}
 	case {{$svc.ServiceType}}Service:
+		matched["{{$svc.ServiceType}}"] = true
 		_register{{$svc.ServiceType}}GRPC(s, v)
 	{{- end}}
 	}
