@@ -192,9 +192,7 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 		// Pre-resolve method at startup — no per-request MethodByName.
 		srvVal := reflect.ValueOf(svr)
 		method := srvVal.MethodByName(md.Name)
-		if !method.IsValid() {
-			panic(fmt.Sprintf("gofr: service %q has no method %q", desc.Name, md.Name))
-		}
+		transport.ValidateServiceMethod(desc.Name, md.Name, method, &md)
 
 		grpcDesc.Methods = append(grpcDesc.Methods, grpc.MethodDesc{
 			MethodName: md.Name,

@@ -18,9 +18,7 @@ func RegisterService(s *Server, desc *transport.ServiceDesc, svr interface{}) {
 
 	for _, m := range desc.Methods {
 		method := val.MethodByName(m.Name)
-		if !method.IsValid() {
-			panic(fmt.Sprintf("gofr: service %q has no method %q", desc.Name, m.Name))
-		}
+		transport.ValidateServiceMethod(desc.Name, m.Name, method, &m)
 
 		httpMethod := m.HTTPMethod
 		if httpMethod == "" {

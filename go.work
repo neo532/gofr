@@ -1,11 +1,11 @@
-go 1.23.1
+go 1.26.1
 
 use (
 	.
-	./transport/http
+	./cmd/protoc-gen-go-svc
+	./example/helloworld
 	./transport/grpc
+	./transport/http
 	./transport/rpcx
 	./transport/websocket
-	./example/helloworld
-	./cmd/protoc-gen-go-svc
 )
