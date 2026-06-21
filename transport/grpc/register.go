@@ -26,12 +26,18 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// GrpcOptions passes raw grpc.ServerOption to the underlying grpc.Server.
+func GrpcOptions(opts ...grpc.ServerOption) ServerOption {
+	return func(s *Server) { s.grpcOpts = append(s.grpcOpts, opts...) }
+}
+
 // Server wraps grpc.Server and implements transport.Server with middleware.
 type Server struct {
 	*grpc.Server
 	address   string
 	lis       net.Listener
 	mwManager *MiddlewareManager
+	grpcOpts  []grpc.ServerOption
 }
 
 // Addr returns the actual listening address, available after Start.
@@ -42,29 +48,18 @@ func (s *Server) Addr() string {
 	return s.address
 }
 
-// NewServer creates a gRPC server.
-func NewServer(address string, opts ...grpc.ServerOption) *Server {
+// NewServer creates a gRPC server with gofr options.
+func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
-		address:   address,
-		mwManager: newMiddlewareManager(),
-	}
-	opts = append([]grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(unaryServerInterceptor(s)),
-	}, opts...)
-	s.Server = grpc.NewServer(opts...)
-	return s
-}
-
-// NewServerWith creates a gRPC server with gofr options.
-func NewServerWith(address string, opts ...ServerOption) *Server {
-	s := &Server{
-		address:   address,
 		mwManager: newMiddlewareManager(),
 	}
 	for _, o := range opts {
 		o(s)
 	}
-	s.Server = grpc.NewServer(grpc.ChainUnaryInterceptor(unaryServerInterceptor(s)))
+	s.grpcOpts = append([]grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(unaryServerInterceptor(s)),
+	}, s.grpcOpts...)
+	s.Server = grpc.NewServer(s.grpcOpts...)
 	return s
 }
 

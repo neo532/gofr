@@ -89,7 +89,7 @@ func invoke(t *testing.T, conn *grpc.ClientConn, method string, req, reply any) 
 }
 
 func TestGRPCRegisterServiceWith(t *testing.T) {
-	srv := NewServer(":0")
+	srv := NewServer(Address(":0"))
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
 		NewReq  func() interface{}
@@ -119,7 +119,7 @@ func TestGRPCMiddleware(t *testing.T) {
 	var mu sync.Mutex
 	logged := false
 
-	srv := NewServerWith(":0",
+	srv := NewServer(Address(":0"),
 		Middleware(func(next transport.Handler) transport.Handler {
 			return func(ctx context.Context, req interface{}) (interface{}, error) {
 				mu.Lock()
@@ -162,7 +162,7 @@ func TestGRPCUseWith(t *testing.T) {
 	var mu sync.Mutex
 	logged := false
 
-	srv := NewServer(":0")
+	srv := NewServer(Address(":0"))
 	srv.UseWith("/test.Greeter/SayHello", func(next transport.Handler) transport.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			mu.Lock()
@@ -201,7 +201,7 @@ func TestGRPCUseWith(t *testing.T) {
 }
 
 func TestGRPCRegisterService(t *testing.T) {
-	srv := NewServer(":0")
+	srv := NewServer(Address(":0"))
 	RegisterService(srv, testServiceDesc, &testSvc{})
 
 	addr, stop := startGRPCServer(t, srv)
@@ -234,7 +234,7 @@ func startServerEx(t *testing.T, srv *Server) (addr string, stop func()) {
 }
 
 func TestGRPCLifecycle(t *testing.T) {
-	srv := NewServer(":0")
+	srv := NewServer(Address(":0"))
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
 		NewReq  func() interface{}
