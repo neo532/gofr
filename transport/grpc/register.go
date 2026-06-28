@@ -75,7 +75,7 @@ func (s *Server) UseWith(method string, m ...middleware.Middleware) {
 
 // unaryServerInterceptor wraps the context with a Transporter carrying request/reply metadata.
 func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		incomingMD, _ := metadata.FromIncomingContext(ctx)
 		replyMD := make(metadata.MD)
 
@@ -136,18 +136,18 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // UnaryHandler is a direct type-safe handler for a single gRPC method.
 // Used by generated code for zero-reflection registration.
-type UnaryHandler func(ctx context.Context, req interface{}) (interface{}, error)
+type UnaryHandler func(ctx context.Context, req any) (any, error)
 
 // RegisterServiceWith registers a multi-method gRPC service with direct handlers.
 // Middleware is applied per method via PrebuildHandler.
-func RegisterServiceWith(s *Server, serviceName string, svr interface{}, methods []struct {
+func RegisterServiceWith(s *Server, serviceName string, svr any, methods []struct {
 	Name    string
-	NewReq  func() interface{}
+	NewReq  func() any
 	Handler UnaryHandler
 }) {
 	desc := &grpc.ServiceDesc{
 		ServiceName: serviceName,
-		HandlerType: (*interface{})(nil),
+		HandlerType: (*any)(nil),
 	}
 	for _, m := range methods {
 		md := m
@@ -156,7 +156,7 @@ func RegisterServiceWith(s *Server, serviceName string, svr interface{}, methods
 
 		desc.Methods = append(desc.Methods, grpc.MethodDesc{
 			MethodName: md.Name,
-			Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+			Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 				req := md.NewReq()
 				if err := dec(req); err != nil {
 					return nil, err
@@ -167,7 +167,7 @@ func RegisterServiceWith(s *Server, serviceName string, svr interface{}, methods
 						Server:     srv,
 						FullMethod: fullMethod,
 					}
-					return interceptor(ctx, req, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+					return interceptor(ctx, req, info, func(ctx context.Context, req any) (any, error) {
 						return wrapped(ctx, req)
 					})
 				}
@@ -180,10 +180,10 @@ func RegisterServiceWith(s *Server, serviceName string, svr interface{}, methods
 
 // RegisterService registers a service from transport.ServiceDesc onto the gRPC server.
 // MethodByName runs at registration time (startup), not per-request — only reflect.Call remains.
-func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) {
+func RegisterService(srv *Server, desc *transport.ServiceDesc, svr any) {
 	grpcDesc := &grpc.ServiceDesc{
 		ServiceName: desc.Name,
-		HandlerType: (*interface{})(nil),
+		HandlerType: (*any)(nil),
 	}
 	for _, m := range desc.Methods {
 		md := m
@@ -196,7 +196,7 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 
 		grpcDesc.Methods = append(grpcDesc.Methods, grpc.MethodDesc{
 			MethodName: md.Name,
-			Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+			Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 				req := md.NewRequest()
 				if err := dec(req); err != nil {
 					return nil, err
@@ -206,7 +206,7 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 						Server:     srv,
 						FullMethod: fullMethod,
 					}
-					return interceptor(ctx, req, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+					return interceptor(ctx, req, info, func(ctx context.Context, req any) (any, error) {
 						return callMethod(method, ctx, req)
 					})
 				}
@@ -218,7 +218,7 @@ func RegisterService(srv *Server, desc *transport.ServiceDesc, svr interface{}) 
 }
 
 // callMethod dispatches with a pre-resolved method value — no MethodByName at request time.
-func callMethod(method reflect.Value, ctx context.Context, req interface{}) (interface{}, error) {
+func callMethod(method reflect.Value, ctx context.Context, req any) (any, error) {
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(ctx),
 		reflect.ValueOf(req),

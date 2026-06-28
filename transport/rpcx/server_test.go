@@ -72,7 +72,7 @@ func TestRPCXMiddleware(t *testing.T) {
 
 	srv := NewServer(":0",
 		Middleware(func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) {
+			return func(ctx context.Context, req any) (any, error) {
 				logged = true
 				return next(ctx, req)
 			}
@@ -101,7 +101,7 @@ func TestRPCXUseWith(t *testing.T) {
 
 	srv := NewServer(":0")
 	srv.UseWith("/HelloService/SayHello", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return func(ctx context.Context, req any) (any, error) {
 			logged = true
 			return next(ctx, req)
 		}

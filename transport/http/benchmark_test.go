@@ -39,7 +39,7 @@ func BenchmarkGenericDispatch(b *testing.B) {
 	ctx := context.Background()
 	req := &benchReq{Name: "test"}
 
-	var handler transport.Handler = func(ctx context.Context, req interface{}) (interface{}, error) {
+	var handler transport.Handler = func(ctx context.Context, req any) (any, error) {
 		return benchSvc.Hello(ctx, req.(*benchReq))
 	}
 
@@ -55,13 +55,13 @@ func BenchmarkMiddleware2(b *testing.B) {
 	req := &benchReq{Name: "test"}
 	mid := middleware.Chain(
 		func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) { return next(ctx, req) }
+			return func(ctx context.Context, req any) (any, error) { return next(ctx, req) }
 		},
 		func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) { return next(ctx, req) }
+			return func(ctx context.Context, req any) (any, error) { return next(ctx, req) }
 		},
 	)
-	var base transport.Handler = func(ctx context.Context, req interface{}) (interface{}, error) {
+	var base transport.Handler = func(ctx context.Context, req any) (any, error) {
 		return benchSvc.Hello(ctx, req.(*benchReq))
 	}
 	h := mid(base)

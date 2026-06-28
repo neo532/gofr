@@ -11,8 +11,8 @@ import (
 // Codec represents a pair of request decoder and response encoder for a content type.
 type Codec struct {
 	ContentType string               // e.g. "application/json"
-	Decode      func([]byte, interface{}) error
-	Encode      func(interface{}) ([]byte, error)
+	Decode      func([]byte, any) error
+	Encode      func(any) ([]byte, error)
 }
 
 var (
@@ -58,16 +58,16 @@ func matchCodec(ct string) *Codec {
 }
 
 // DecodeRequestFunc decodes an HTTP request into the given value.
-type DecodeRequestFunc func(*http.Request, interface{}) error
+type DecodeRequestFunc func(*http.Request, any) error
 
 // EncodeResponseFunc encodes a value into an HTTP response.
-type EncodeResponseFunc func(http.ResponseWriter, *http.Request, interface{}) error
+type EncodeResponseFunc func(http.ResponseWriter, *http.Request, any) error
 
 // EncodeErrorFunc encodes an error into an HTTP response.
 type EncodeErrorFunc func(http.ResponseWriter, *http.Request, error)
 
 // DefaultRequestDecoder decodes request body based on Content-Type.
-func DefaultRequestDecoder(r *http.Request, v interface{}) error {
+func DefaultRequestDecoder(r *http.Request, v any) error {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func DefaultRequestDecoder(r *http.Request, v interface{}) error {
 }
 
 // DefaultResponseEncoder encodes response based on Accept header.
-func DefaultResponseEncoder(w http.ResponseWriter, r *http.Request, v interface{}) error {
+func DefaultResponseEncoder(w http.ResponseWriter, r *http.Request, v any) error {
 	c := matchCodec(r.Header.Get("Accept"))
 	w.Header().Set("Content-Type", c.ContentType)
 	if v == nil {
@@ -105,7 +105,7 @@ func DefaultErrorEncoder(w http.ResponseWriter, r *http.Request, err error) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"error": err.Error(),
 	})
 }

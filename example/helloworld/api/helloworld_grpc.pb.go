@@ -12,20 +12,20 @@ import (
 func _registerGreeterGRPC(s *grpc.Server, svr GreeterServer) {
 	grpc.RegisterServiceWith(s, "helloworld.Greeter", svr, []struct {
 		Name    string
-		NewReq  func() interface{}
+		NewReq  func() any
 		Handler grpc.UnaryHandler
 	}{
-		{Name: "SayHello", NewReq: func() interface{} { return &HelloRequest{} }, Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+		{Name: "SayHello", NewReq: func() any { return &HelloRequest{} }, Handler: func(ctx context.Context, req any) (any, error) {
 			return svr.SayHello(ctx, req.(*HelloRequest))
 		}},
-		{Name: "Hello", NewReq: func() interface{} { return &HelloRequest{} }, Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+		{Name: "Hello", NewReq: func() any { return &HelloRequest{} }, Handler: func(ctx context.Context, req any) (any, error) {
 			return svr.Hello(ctx, req.(*HelloRequest))
 		}},
 	})
 }
 
 // RegisterGRPCServer registers all services to the gRPC server.
-func RegisterGRPCServer(s *grpc.Server, svrs ...interface{}) {
+func RegisterGRPCServer(s *grpc.Server, svrs ...any) {
 	for _, svr := range svrs {
 		switch v := svr.(type) {
 		case GreeterServer:

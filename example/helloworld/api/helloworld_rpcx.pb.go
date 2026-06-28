@@ -38,7 +38,7 @@ func _registerGreeterRPCX(s *rpcx.Server, svr GreeterServer) {
 }
 
 // RegisterRPCXServer registers all services to the rpcx server.
-func RegisterRPCXServer(s *rpcx.Server, svrs ...interface{}) {
+func RegisterRPCXServer(s *rpcx.Server, svrs ...any) {
 	for _, svr := range svrs {
 		switch v := svr.(type) {
 		case GreeterServer:

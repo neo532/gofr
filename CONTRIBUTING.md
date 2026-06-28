@@ -21,7 +21,7 @@ Create a new package `transport/<name>/` with:
 Add a `RegisterServiceWith` function that registers a service with the transport:
 
 ```go
-func RegisterServiceWith(s *Server, serviceName string, svr interface{}) {
+func RegisterServiceWith(s *Server, serviceName string, svr any) {
     // register the service with the underlying transport
 }
 ```
@@ -35,7 +35,7 @@ Create `<name>Template.tpl`. This template generates a `_<name>.pb.go` file.
 The template should:
 - Generate a wrapper adapter if needed (e.g. rpcx requires `(ctx, *args, *reply) error` signatures)
 - Generate `_register<Service><NAME>` helper functions
-- Generate `Register<NAME>Server(s *<name>.Server, svrs ...interface{})` — dispatches via type switch
+- Generate `Register<NAME>Server(s *<name>.Server, svrs ...any)` — dispatches via type switch
 
 ### 3b. Embed and register the template
 

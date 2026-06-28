@@ -14,7 +14,7 @@ type middlewarePlugin struct {
 	mwManager *MiddlewareManager
 }
 
-func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMethod string, args interface{}) (interface{}, error) {
+func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMethod string, args any) (any, error) {
 	fullMethod := "/" + servicePath + "/" + serviceMethod
 
 	// Inject Transporter into the mutable share.Context so that
@@ -49,12 +49,12 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 	}
 
 	chain := middleware.Chain(matched...)
-	h := chain(func(ctx context.Context, req interface{}) (interface{}, error) {
+	h := chain(func(ctx context.Context, req any) (any, error) {
 		return req, nil
 	})
 	return h(ctx, args)
 }
 
-func (p *middlewarePlugin) PostCall(ctx context.Context, servicePath, serviceMethod string, args, reply interface{}, err error) (interface{}, error) {
+func (p *middlewarePlugin) PostCall(ctx context.Context, servicePath, serviceMethod string, args, reply any, err error) (any, error) {
 	return reply, err
 }

@@ -10,7 +10,7 @@ import (
 // if it implements the Validate() error interface.
 func Validator() Middleware {
 	return func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return func(ctx context.Context, req any) (any, error) {
 			if v, ok := req.(interface{ Validate() error }); ok {
 				if err := v.Validate(); err != nil {
 					return nil, err

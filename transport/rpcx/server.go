@@ -27,6 +27,12 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// RpcxOptions passes raw rpcx server.OptionFn to the underlying rpcx server.
+// e.g. rpcx.RpcxOptions(rpcxServer.WithReadTimeout(10*time.Second))
+func RpcxOptions(opts ...rpcxServer.OptionFn) ServerOption {
+	return func(s *Server) { s.rpcxOpts = append(s.rpcxOpts, opts...) }
+}
+
 // Server wraps rpcx server.Server and implements transport.Server.
 type Server struct {
 	*rpcxServer.Server
@@ -34,6 +40,7 @@ type Server struct {
 	address   string
 	lis       net.Listener
 	mwManager *MiddlewareManager
+	rpcxOpts  []rpcxServer.OptionFn
 }
 
 // Addr returns the actual listening address, available after Start.
@@ -46,19 +53,17 @@ func (s *Server) Addr() string {
 
 // NewServer creates an rpcx server with middleware support.
 // HTTP and JSON gateways are disabled — rpcx runs as a pure RPC transport.
-func NewServer(address string, opts ...ServerOption) *Server {
+func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
-		Server:    rpcxServer.NewServer(),
 		network:   "tcp",
-		address:   address,
 		mwManager: newMiddlewareManager(),
 	}
-	s.Server.DisableHTTPGateway = true
-	s.Server.DisableJSONRPC = true
 	for _, o := range opts {
 		o(s)
 	}
-	// Attach middleware as an rpcx plugin
+	s.Server = rpcxServer.NewServer(s.rpcxOpts...)
+	s.Server.DisableHTTPGateway = true
+	s.Server.DisableJSONRPC = true
 	s.Plugins.Add(&middlewarePlugin{mwManager: s.mwManager})
 	return s
 }
@@ -97,7 +102,7 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // RegisterServiceWith registers a service with per-method middleware prebuilding.
 // Compatible with generated code for zero-reflection registration.
-func RegisterServiceWith(s *Server, serviceName string, svr interface{}) {
+func RegisterServiceWith(s *Server, serviceName string, svr any) {
 	if err := s.RegisterName(serviceName, svr, ""); err != nil {
 		panic("rpcx: RegisterName(" + serviceName + "): " + err.Error())
 	}

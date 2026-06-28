@@ -5,12 +5,19 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
+
+// BinaryMessage is a sent for WebSocket binary frames (matches gorilla/websocket.BinaryMessage).
+const BinaryMessage = 2
+
+// Conn is a WebSocket connection (aliased from gorilla/websocket).
+type Conn = websocket.Conn
 
 // WsHandler handles an upgraded WebSocket connection.
 type WsHandler func(ctx context.Context, conn *websocket.Conn) error
@@ -28,6 +35,11 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// Timeout sets the read timeout on the underlying HTTP server.
+func Timeout(d time.Duration) ServerOption {
+	return func(s *Server) { s.timeout = d }
+}
+
 // Server is a standalone WebSocket server implementing transport.Server.
 type Server struct {
 	address   string
@@ -37,15 +49,16 @@ type Server struct {
 	upgrader  websocket.Upgrader
 	mwManager *MiddlewareManager
 	httpSrv   *http.Server
+	timeout   time.Duration
 }
 
 // NewServer creates a WebSocket server.
-func NewServer(address string, opts ...ServerOption) *Server {
+func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
-		address:   address,
 		mux:       make(map[string]WsHandler),
 		upgrader:  websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
 		mwManager: newMiddlewareManager(),
+		httpSrv:   &http.Server{},
 	}
 	for _, o := range opts {
 		o(s)
@@ -86,9 +99,8 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.lis = lis
 
-	s.httpSrv = &http.Server{
-		Handler: http.HandlerFunc(s.serveHTTP),
-	}
+	s.httpSrv.Handler = http.HandlerFunc(s.serveHTTP)
+	s.httpSrv.ReadTimeout = s.timeout
 
 	go func() {
 		<-ctx.Done()
@@ -126,7 +138,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	matched := s.mwManager.Match(r.URL.Path)
 	if len(matched) > 0 {
 		chain := middleware.Chain(matched...)
-		_, err := chain(func(ctx context.Context, req interface{}) (interface{}, error) {
+		_, err := chain(func(ctx context.Context, req any) (any, error) {
 			return nil, nil
 		})(ctx, nil)
 		if err != nil {

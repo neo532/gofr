@@ -32,7 +32,7 @@ var testServiceDesc = &transport.ServiceDesc{
 	Methods: []transport.MethodDesc{
 		{
 			Name:       "SayHello",
-			NewRequest: func() interface{} { return &helloReq{} },
+			NewRequest: func() any { return &helloReq{} },
 		},
 	},
 }
@@ -107,7 +107,7 @@ func TestAnnotationRoute(t *testing.T) {
 		Methods: []transport.MethodDesc{
 			{
 				Name:       "SayHello",
-				NewRequest: func() interface{} { return &helloReq{} },
+				NewRequest: func() any { return &helloReq{} },
 				HTTPMethod: "GET",
 				HTTPPath:   "/api/v1/hello/{name}",
 			},
@@ -192,7 +192,7 @@ func TestServerMiddleware(t *testing.T) {
 
 	srv := NewServer(Address(":0"),
 		Middleware(func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) {
+			return func(ctx context.Context, req any) (any, error) {
 				logged = true
 				return next(ctx, req)
 			}

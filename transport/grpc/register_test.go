@@ -47,7 +47,7 @@ var testServiceDesc = &transport.ServiceDesc{
 	Methods: []transport.MethodDesc{
 		{
 			Name:       "SayHello",
-			NewRequest: func() interface{} { return &helloReq{} },
+			NewRequest: func() any { return &helloReq{} },
 		},
 	},
 }
@@ -92,13 +92,13 @@ func TestGRPCRegisterServiceWith(t *testing.T) {
 	srv := NewServer(Address(":0"))
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
-		NewReq  func() interface{}
+		NewReq  func() any
 		Handler UnaryHandler
 	}{
 		{
 			Name:   "SayHello",
-			NewReq: func() interface{} { return &helloReq{} },
-			Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
 				return testSvc{}.SayHello(ctx, req.(*helloReq))
 			},
 		},
@@ -121,7 +121,7 @@ func TestGRPCMiddleware(t *testing.T) {
 
 	srv := NewServer(Address(":0"),
 		Middleware(func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) {
+			return func(ctx context.Context, req any) (any, error) {
 				mu.Lock()
 				logged = true
 				mu.Unlock()
@@ -131,13 +131,13 @@ func TestGRPCMiddleware(t *testing.T) {
 	)
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
-		NewReq  func() interface{}
+		NewReq  func() any
 		Handler UnaryHandler
 	}{
 		{
 			Name:   "SayHello",
-			NewReq: func() interface{} { return &helloReq{} },
-			Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
 				return testSvc{}.SayHello(ctx, req.(*helloReq))
 			},
 		},
@@ -164,7 +164,7 @@ func TestGRPCUseWith(t *testing.T) {
 
 	srv := NewServer(Address(":0"))
 	srv.UseWith("/test.Greeter/SayHello", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return func(ctx context.Context, req any) (any, error) {
 			mu.Lock()
 			logged = true
 			mu.Unlock()
@@ -173,13 +173,13 @@ func TestGRPCUseWith(t *testing.T) {
 	})
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
-		NewReq  func() interface{}
+		NewReq  func() any
 		Handler UnaryHandler
 	}{
 		{
 			Name:   "SayHello",
-			NewReq: func() interface{} { return &helloReq{} },
-			Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
 				return testSvc{}.SayHello(ctx, req.(*helloReq))
 			},
 		},
@@ -237,13 +237,13 @@ func TestGRPCLifecycle(t *testing.T) {
 	srv := NewServer(Address(":0"))
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
-		NewReq  func() interface{}
+		NewReq  func() any
 		Handler UnaryHandler
 	}{
 		{
 			Name:   "SayHello",
-			NewReq: func() interface{} { return &helloReq{} },
-			Handler: func(ctx context.Context, req interface{}) (interface{}, error) {
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
 				return &helloReply{Message: fmt.Sprintf("Hello %s", req.(*helloReq).Name)}, nil
 			},
 		},

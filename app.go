@@ -20,7 +20,7 @@ type App struct {
 }
 
 // New creates an App.
-func New(opts ...Option) *App {
+func New(opts ...Option) (a *App) {
 	o := &options{
 		ctx:         context.Background(),
 		sigs:        []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT},
@@ -30,8 +30,9 @@ func New(opts ...Option) *App {
 		opt(o)
 	}
 
-	_, cancel := context.WithCancel(o.ctx)
-	return &App{opts: o, cancel: cancel}
+	a = &App{opts: o}
+	o.ctx, a.cancel = context.WithCancel(o.ctx)
+	return
 }
 
 // Run starts all servers and blocks until a signal or a server error.

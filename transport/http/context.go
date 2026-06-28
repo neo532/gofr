@@ -21,10 +21,10 @@ type Context interface {
 	Response() http.ResponseWriter
 	PathValue(key string) string
 	Query() url.Values
-	Bind(interface{}) error
-	JSON(int, interface{}) error
+	Bind(any) error
+	JSON(int, any) error
 	String(int, string) error
-	Result(int, interface{}) error
+	Result(int, any) error
 	Middleware(transport.Handler) transport.Handler
 }
 
@@ -41,14 +41,14 @@ var _ Context = (*wrapper)(nil)
 func (c *wrapper) Deadline() (time.Time, bool)    { return c.req.Context().Deadline() }
 func (c *wrapper) Done() <-chan struct{}           { return c.req.Context().Done() }
 func (c *wrapper) Err() error                      { return c.req.Context().Err() }
-func (c *wrapper) Value(k interface{}) interface{} { return c.req.Context().Value(k) }
+func (c *wrapper) Value(k any) any { return c.req.Context().Value(k) }
 func (c *wrapper) Request() *http.Request          { return c.req }
 func (c *wrapper) Response() http.ResponseWriter   { return c.res }
 func (c *wrapper) PathValue(key string) string     { return c.params.ByName(key) }
 func (c *wrapper) Query() url.Values               { return c.req.URL.Query() }
-func (c *wrapper) Bind(v interface{}) error        { return c.codec(c.req, v) }
+func (c *wrapper) Bind(v any) error        { return c.codec(c.req, v) }
 
-func (c *wrapper) JSON(code int, v interface{}) error {
+func (c *wrapper) JSON(code int, v any) error {
 	c.res.Header().Set("Content-Type", "application/json")
 	c.res.WriteHeader(code)
 	return json.NewEncoder(c.res).Encode(v)
@@ -61,7 +61,7 @@ func (c *wrapper) String(code int, text string) error {
 	return err
 }
 
-func (c *wrapper) Result(code int, v interface{}) error {
+func (c *wrapper) Result(code int, v any) error {
 	return c.srv.enc(c.res, c.req, v)
 }
 

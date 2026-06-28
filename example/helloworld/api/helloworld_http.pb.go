@@ -20,7 +20,7 @@ func _registerGreeterHTTP(s *http.Server, svr GreeterServer) {
 }
 
 // RegisterHTTPServer registers all services to the HTTP server.
-func RegisterHTTPServer(s *http.Server, svrs ...interface{}) {
+func RegisterHTTPServer(s *http.Server, svrs ...any) {
 	for _, svr := range svrs {
 		switch v := svr.(type) {
 		case GreeterServer:

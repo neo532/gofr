@@ -17,11 +17,11 @@ import (
 )
 
 var wrapperPool = sync.Pool{
-	New: func() interface{} { return &wrapper{} },
+	New: func() any { return &wrapper{} },
 }
 
 var transportPool = sync.Pool{
-	New: func() interface{} { return &Transport{} },
+	New: func() any { return &Transport{} },
 }
 
 // ServerOption configures the HTTP server.
@@ -88,7 +88,7 @@ func NewServer(opts ...ServerOption) *Server {
 		ene:       DefaultErrorEncoder,
 		mwManager: newMiddlewareManager(),
 	}
-	s.router.PanicHandler = func(w http.ResponseWriter, r *http.Request, v interface{}) {
+	s.router.PanicHandler = func(w http.ResponseWriter, r *http.Request, v any) {
 		http.Error(w, "panic", http.StatusInternalServerError)
 	}
 	for _, o := range opts {

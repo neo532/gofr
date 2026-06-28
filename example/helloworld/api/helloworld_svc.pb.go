@@ -20,13 +20,13 @@ var GreeterServiceDesc = &transport.ServiceDesc{
 	Methods: []transport.MethodDesc{
 		{
 			Name:       "SayHello",
-			NewRequest: func() interface{} { return &HelloRequest{} },
+			NewRequest: func() any { return &HelloRequest{} },
 			HTTPMethod: "POST",
 			HTTPPath:   "/api/v1/greeter",
 		},
 		{
 			Name:       "Hello",
-			NewRequest: func() interface{} { return &HelloRequest{} },
+			NewRequest: func() any { return &HelloRequest{} },
 			HTTPMethod: "GET",
 			HTTPPath:   "/api/v1/hello/{name}",
 		},

@@ -93,7 +93,7 @@ func TestWebSocketMiddleware(t *testing.T) {
 
 	srv := NewServer(":0",
 		Middleware(func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) {
+			return func(ctx context.Context, req any) (any, error) {
 				mu.Lock()
 				logged = true
 				mu.Unlock()
@@ -130,7 +130,7 @@ func TestWebSocketUseWith(t *testing.T) {
 
 	srv := NewServer(":0")
 	srv.UseWith("/test", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return func(ctx context.Context, req any) (any, error) {
 			mu.Lock()
 			logged = true
 			mu.Unlock()
@@ -163,7 +163,7 @@ func TestWebSocketUseWith(t *testing.T) {
 func TestWebSocketMiddlewareRejects(t *testing.T) {
 	srv := NewServer(":0",
 		Middleware(func(next transport.Handler) transport.Handler {
-			return func(ctx context.Context, req interface{}) (interface{}, error) {
+			return func(ctx context.Context, req any) (any, error) {
 				return nil, transportError("rejected")
 			}
 		}),

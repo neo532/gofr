@@ -13,7 +13,7 @@ import (
 
 // RegisterService registers all methods of a service via ServiceDesc.
 // MethodByName runs at registration time (startup), leaving only reflect.Call per request.
-func RegisterService(s *Server, desc *transport.ServiceDesc, svr interface{}) {
+func RegisterService(s *Server, desc *transport.ServiceDesc, svr any) {
 	val := reflect.ValueOf(svr)
 
 	for _, m := range desc.Methods {
@@ -67,7 +67,7 @@ func RegisterHandler[Req, Res any](
 	path := "/" + operation
 
 	matched := s.mwManager.Match(path)
-	wrapped := func(ctx context.Context, req interface{}) (interface{}, error) {
+	wrapped := func(ctx context.Context, req any) (any, error) {
 		return fn(ctx, req.(*Req))
 	}
 	prebuilt := middleware.Chain(matched...)(wrapped)
@@ -95,7 +95,7 @@ func RegisterUnary[Req, Res any](
 	fn func(context.Context, *Req) (*Res, error),
 	dec func(Context, *Req) error,
 ) {
-	wrapped := func(ctx context.Context, req interface{}) (interface{}, error) {
+	wrapped := func(ctx context.Context, req any) (any, error) {
 		return fn(ctx, req.(*Req))
 	}
 	matched := s.mwManager.Match(path)
@@ -149,7 +149,7 @@ func extractPathParams(path string) []string {
 	return params
 }
 
-func injectPathParams(req interface{}, paramNames []string, ctx Context) {
+func injectPathParams(req any, paramNames []string, ctx Context) {
 	if len(paramNames) == 0 {
 		return
 	}
@@ -209,7 +209,7 @@ func snakeToPascal(s string) string {
 
 // buildFastHandler pre-resolves reflect.Value at registration; only reflect.Call remains per request.
 func buildFastHandler(method reflect.Value) transport.Handler {
-	return func(ctx context.Context, req interface{}) (interface{}, error) {
+	return func(ctx context.Context, req any) (any, error) {
 		var args [2]reflect.Value
 		args[0] = reflect.ValueOf(ctx)
 		args[1] = reflect.ValueOf(req)

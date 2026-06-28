@@ -151,7 +151,7 @@ Every request carries a `transport.Transporter` in the context, accessible via `
 
 ```go
 func MyMiddleware(next transport.Handler) transport.Handler {
-    return func(ctx context.Context, req interface{}) (interface{}, error) {
+    return func(ctx context.Context, req any) (any, error) {
         if tr, ok := transport.FromServerContext(ctx); ok {
             log.Printf("kind=%s operation=%s", tr.Kind(), tr.Operation())
         }

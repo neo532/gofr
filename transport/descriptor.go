@@ -7,7 +7,7 @@ import (
 )
 
 // Handler defines the handler invoked by Middleware.
-type Handler func(ctx context.Context, req interface{}) (interface{}, error)
+type Handler func(ctx context.Context, req any) (any, error)
 
 // ValidateServiceMethod checks that a concrete method matches its descriptor at registration time.
 func ValidateServiceMethod(svcName, methodName string, method reflect.Value, desc *MethodDesc) {
@@ -54,9 +54,9 @@ type MethodDesc struct {
 	// Name is the method name, must match the method on the service implementation.
 	Name string
 	// NewRequest creates a new empty request value.
-	NewRequest func() interface{}
+	NewRequest func() any
 	// NewResponse creates a new empty response value. Used for signature validation at registration.
-	NewResponse func() interface{}
+	NewResponse func() any
 	// HTTPMethod is optional HTTP method override (e.g. "GET", "POST").
 	HTTPMethod string
 	// HTTPPath is optional HTTP path override (e.g. "/api/v1/hello/{name}").
