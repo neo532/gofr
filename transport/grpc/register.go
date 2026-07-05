@@ -31,6 +31,14 @@ func GrpcOptions(opts ...grpc.ServerOption) ServerOption {
 	return func(s *Server) { s.grpcOpts = append(s.grpcOpts, opts...) }
 }
 
+// WithListener injects an external listener (used by graceful restart).
+func WithListener(lis net.Listener) ServerOption {
+	return func(s *Server) { s.lis = lis }
+}
+
+// SetListener implements transport.ListenerServer for external listener injection.
+func (s *Server) SetListener(lis net.Listener) { s.lis = lis }
+
 // Server wraps grpc.Server and implements transport.Server with middleware.
 type Server struct {
 	*grpc.Server
@@ -103,18 +111,20 @@ func (s *Server) PrebuildHandler(fullMethod string, fn transport.Handler) transp
 
 // Start implements transport.Server.
 func (s *Server) Start(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.address)
-	if err != nil {
-		return err
+	if s.lis == nil {
+		var err error
+		s.lis, err = net.Listen("tcp", s.address)
+		if err != nil {
+			return err
+		}
 	}
-	s.lis = lis
 
 	go func() {
 		<-ctx.Done()
 		s.GracefulStop()
 	}()
 
-	return s.Server.Serve(lis)
+	return s.Server.Serve(s.lis)
 }
 
 // Stop implements transport.Server with context deadline.

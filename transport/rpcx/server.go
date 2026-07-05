@@ -33,6 +33,14 @@ func RpcxOptions(opts ...rpcxServer.OptionFn) ServerOption {
 	return func(s *Server) { s.rpcxOpts = append(s.rpcxOpts, opts...) }
 }
 
+// WithListener injects an external listener (used by graceful restart).
+func WithListener(lis net.Listener) ServerOption {
+	return func(s *Server) { s.lis = lis }
+}
+
+// SetListener implements transport.ListenerServer for external listener injection.
+func (s *Server) SetListener(lis net.Listener) { s.lis = lis }
+
 // Server wraps rpcx server.Server and implements transport.Server.
 type Server struct {
 	*rpcxServer.Server
@@ -80,18 +88,20 @@ func (s *Server) UseWith(method string, m ...middleware.Middleware) {
 
 // Start implements transport.Server.
 func (s *Server) Start(ctx context.Context) error {
-	lis, err := net.Listen(s.network, s.address)
-	if err != nil {
-		return err
+	if s.lis == nil {
+		var err error
+		s.lis, err = net.Listen(s.network, s.address)
+		if err != nil {
+			return err
+		}
 	}
-	s.lis = lis
 
 	go func() {
 		<-ctx.Done()
 		s.Shutdown(ctx)
 	}()
 
-	go s.ServeListener(s.network, lis)
+	go s.ServeListener(s.network, s.lis)
 	return nil
 }
 

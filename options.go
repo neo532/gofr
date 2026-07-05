@@ -31,6 +31,9 @@ type options struct {
 	beforeStop  []func(context.Context) error
 	afterStop   []func(context.Context) error
 
+	enableUpgrader bool
+	pidFile        string
+
 	// endpoints []*url.URL
 	// registrar        registry.Registrar
 	// registrarTimeout time.Duration
@@ -86,4 +89,12 @@ func BeforeStop(fn func(context.Context) error) Option {
 
 func AfterStop(fn func(context.Context) error) Option {
 	return func(o *options) { o.afterStop = append(o.afterStop, fn) }
+}
+
+func EnableUpgrader() Option {
+	return func(o *options) { o.enableUpgrader = true }
+}
+
+func PIDFile(file string) Option {
+	return func(o *options) { o.pidFile = file }
 }

@@ -40,6 +40,14 @@ func Timeout(d time.Duration) ServerOption {
 	return func(s *Server) { s.timeout = d }
 }
 
+// WithListener injects an external listener (used by graceful restart).
+func WithListener(lis net.Listener) ServerOption {
+	return func(s *Server) { s.lis = lis }
+}
+
+// SetListener implements transport.ListenerServer for external listener injection.
+func (s *Server) SetListener(lis net.Listener) { s.lis = lis }
+
 // Server is a standalone WebSocket server implementing transport.Server.
 type Server struct {
 	address   string
@@ -93,11 +101,13 @@ func (s *Server) UseWith(path string, m ...middleware.Middleware) {
 
 // Start implements transport.Server.
 func (s *Server) Start(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.address)
-	if err != nil {
-		return err
+	if s.lis == nil {
+		var err error
+		s.lis, err = net.Listen("tcp", s.address)
+		if err != nil {
+			return err
+		}
 	}
-	s.lis = lis
 
 	s.httpSrv.Handler = http.HandlerFunc(s.serveHTTP)
 	s.httpSrv.ReadTimeout = s.timeout
@@ -107,7 +117,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.httpSrv.Close()
 	}()
 
-	return s.httpSrv.Serve(lis)
+	return s.httpSrv.Serve(s.lis)
 }
 
 // Stop implements transport.Server.

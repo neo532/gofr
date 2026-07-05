@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"net"
 	"net/url"
 )
 
@@ -9,6 +10,14 @@ import (
 type Server interface {
 	Start(context.Context) error
 	Stop(context.Context) error
+}
+
+// ListenerServer is a Server that supports external listener injection
+// for fd-inheritance graceful restart.
+type ListenerServer interface {
+	Server
+	Addr() string
+	SetListener(net.Listener)
 }
 
 // Endpointer returns registry endpoint.

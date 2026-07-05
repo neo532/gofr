@@ -55,6 +55,15 @@ func ErrorEncoder(ene EncodeErrorFunc) ServerOption {
 	return func(s *Server) { s.ene = ene }
 }
 
+// WithListener injects an external listener (used by graceful restart).
+// When set, Start skips net.Listen and uses this listener directly.
+func WithListener(lis net.Listener) ServerOption {
+	return func(s *Server) { s.lis = lis }
+}
+
+// SetListener implements transport.ListenerServer for external listener injection.
+func (s *Server) SetListener(lis net.Listener) { s.lis = lis }
+
 // Server is an HTTP server wrapper based on httprouter.
 type Server struct {
 	router    *httprouter.Router
@@ -180,11 +189,13 @@ func (s *Server) PrebuildHandler(operation string, fn transport.Handler) transpo
 
 // Start implements transport.Server.
 func (s *Server) Start(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.address)
-	if err != nil {
-		return err
+	var err error
+	if s.lis == nil {
+		s.lis, err = net.Listen("tcp", s.address)
+		if err != nil {
+			return err
+		}
 	}
-	s.lis = lis
 
 	srv := &http.Server{
 		Addr:        s.address,
