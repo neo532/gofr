@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
@@ -65,10 +66,6 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		GoImportPath: "context",
 		GoName:       "Context",
 	})
-	g.QualifiedGoIdent(protogen.GoIdent{
-		GoImportPath: protogen.GoImportPath("github.com/neo532/gofr/transport"),
-		GoName:       "ServiceDesc",
-	})
 
 	var services []*serviceDesc
 	for _, svc := range file.Services {
@@ -78,6 +75,9 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		}
 		for _, method := range svc.Methods {
 			httpMethod, httpPath := extractHTTPBinding(method)
+			if httpMethod == "" {
+				httpMethod = "POST"
+			}
 			routerPath := httpPath
 			if routerPath == "" {
 				routerPath = fmt.Sprintf("/%s/%s", sd.ServiceName, method.GoName)
@@ -85,13 +85,15 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 				routerPath = toHTTPRouterPath(routerPath)
 			}
 			sd.Methods = append(sd.Methods, methodDesc{
-				Name:       method.GoName,
-				Request:    g.QualifiedGoIdent(method.Input.GoIdent),
-				Reply:      g.QualifiedGoIdent(method.Output.GoIdent),
-				HTTPMethod: httpMethod,
-				HTTPPath:   httpPath,
-				RouterPath: routerPath,
-				PathParams: extractPathParams(httpPath),
+				Name:          method.GoName,
+				Request:       g.QualifiedGoIdent(method.Input.GoIdent),
+				RequestType:   method.Input.GoIdent.GoName,
+				RequestImport: method.Input.GoIdent.GoImportPath,
+				Reply:         g.QualifiedGoIdent(method.Output.GoIdent),
+				HTTPMethod:    httpMethod,
+				HTTPPath:      httpPath,
+				RouterPath:    routerPath,
+				PathParams:    enrichPathParams(method, extractPathParams(httpPath)),
 			})
 		}
 		services = append(services, sd)
@@ -121,10 +123,49 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 			GoImportPath: "reflect",
 			GoName:       "Type",
 		})
+		for _, svc := range file.Services {
+			for _, method := range svc.Methods {
+				hg.QualifiedGoIdent(method.Input.GoIdent)
+			}
+		}
+		if needStrconvImport(services) {
+			hg.QualifiedGoIdent(protogen.GoIdent{
+				GoImportPath: "strconv",
+				GoName:       "ParseInt",
+			})
+		}
 
 		httpOutput := generateHTTP(string(file.GoPackageName), services)
 		for _, line := range splitLines(httpOutput) {
 			hg.P(line)
+		}
+
+		// Emit the Service/Method -> HTTP binding table so a gRPC/rpcx call can
+		// be replayed as a curl against the HTTP endpoint (see http.Route).
+		hg.P()
+		hg.P("// HTTPRoutes maps each gRPC full method (Service/Method) to its HTTP binding,")
+		hg.P("// so a gRPC/rpcx call can be replayed as a curl against the HTTP endpoint.")
+		hg.P("var HTTPRoutes = map[string]http.Route{")
+		for _, svc := range services {
+			for _, m := range svc.Methods {
+				path := m.HTTPPath
+				if path == "" {
+					path = m.RouterPath
+				}
+				hg.P(strconv.Quote(svc.ServiceName+"/"+m.Name) + ": {Service: " +
+					strconv.Quote(svc.ServiceName) + ", Method: " +
+					strconv.Quote(m.Name) + ", HTTPMethod: " +
+					strconv.Quote(m.HTTPMethod) + ", Path: " +
+					strconv.Quote(path) + "},")
+			}
+		}
+		hg.P("}")
+		hg.P()
+		hg.P("func init() { http.RegisterRoutes(HTTPRoutes) }")
+		hg.P()
+
+		if hasPathParams(services) {
+			emitHTTPPathParams(hg, services)
 		}
 	}
 
@@ -307,4 +348,149 @@ func extractOpenAPIFields(m *protogen.Message) []openapiField {
 // messageDefKey creates a unique definition key for a protobuf message.
 func messageDefKey(m *protogen.Message) string {
 	return string(m.Desc.FullName())
+}
+
+// enrichPathParams resolves each path param to its actual proto field and
+// precomputes the zero-reflection bind statement used by generated HTTP decoders,
+// plus the value expression used by the generated ReplayPathParams method.
+func enrichPathParams(method *protogen.Method, params []paramBinding) []paramBinding {
+	for i := range params {
+		p := &params[i]
+		f := findFieldByName(method.Input, p.ProtoName)
+		if f == nil {
+			p.BindStmt = fmt.Sprintf("req.%s = ctx.PathValue(%q)", p.GoField, p.ProtoName)
+			p.ValueExpr = `""`
+			continue
+		}
+		p.GoField = f.GoName
+		p.BindStmt = pathBindStmt(p.GoField, p.ProtoName, f)
+		p.ValueExpr = pathValueExpr(f)
+	}
+	return params
+}
+
+// pathValueExpr returns a Go expression that renders a request field as its
+// path-param string form, without reflection. The receiver is named x, matching
+// the type-asserted local in the generated HTTPPathParams closures. f must be a
+// scalar field.
+func pathValueExpr(f *protogen.Field) string {
+	get := "x.Get" + f.GoName + "()"
+	switch f.Desc.Kind() {
+	case protoreflect.StringKind:
+		return get
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return "strconv.FormatInt(" + get + ", 10)"
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return "strconv.FormatInt(int64(" + get + "), 10)"
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return "strconv.FormatUint(" + get + ", 10)"
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return "strconv.FormatUint(uint64(" + get + "), 10)"
+	case protoreflect.BoolKind:
+		return "strconv.FormatBool(" + get + ")"
+	case protoreflect.DoubleKind:
+		return "strconv.FormatFloat(" + get + ", 'f', -1, 64)"
+	case protoreflect.FloatKind:
+		return "strconv.FormatFloat(float64(" + get + "), 'f', -1, 64)"
+	default:
+		return get
+	}
+}
+
+// findFieldByName matches a path param name against a message's proto fields,
+// accepting both the proto name (snake_case) and the JSON name.
+func findFieldByName(msg *protogen.Message, name string) *protogen.Field {
+	for _, f := range msg.Fields {
+		if string(f.Desc.Name()) == name || f.Desc.JSONName() == name {
+			return f
+		}
+	}
+	return nil
+}
+
+// pathBindStmt builds the assignment that copies a path value into the request
+// field, converting to the field's Go type without reflection.
+func pathBindStmt(goField, protoName string, f *protogen.Field) string {
+	cv := "ctx.PathValue(" + strconv.Quote(protoName) + ")"
+	get := "req." + goField
+	switch f.Desc.Kind() {
+	case protoreflect.StringKind:
+		return fmt.Sprintf("%s = %s", get, cv)
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return fmt.Sprintf("%s, _ = strconv.ParseInt(%s, 10, 64)", get, cv)
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return fmt.Sprintf("if v, err := strconv.ParseInt(%s, 10, 32); err == nil { %s = int32(v) }", cv, get)
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return fmt.Sprintf("%s, _ = strconv.ParseUint(%s, 10, 64)", get, cv)
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return fmt.Sprintf("if v, err := strconv.ParseUint(%s, 10, 32); err == nil { %s = uint32(v) }", cv, get)
+	case protoreflect.DoubleKind:
+		return fmt.Sprintf("%s, _ = strconv.ParseFloat(%s, 64)", get, cv)
+	case protoreflect.FloatKind:
+		return fmt.Sprintf("if v, err := strconv.ParseFloat(%s, 32); err == nil { %s = float32(v) }", cv, get)
+	case protoreflect.BoolKind:
+		return fmt.Sprintf("%s, _ = strconv.ParseBool(%s)", get, cv)
+	default:
+		return fmt.Sprintf("%s = %s", get, cv)
+	}
+}
+
+// hasPathParams reports whether any method carries an HTTP path param.
+func hasPathParams(services []*serviceDesc) bool {
+	for _, svc := range services {
+		for _, m := range svc.Methods {
+			if len(m.PathParams) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// emitHTTPPathParams generates a per-method closure map letting the replay
+// middleware rebuild an HTTP path from a decoded gRPC/rpcx request. Each
+// closure type-asserts the request to its concrete generated type, so no
+// protobuf reflection is needed.
+func emitHTTPPathParams(hg *protogen.GeneratedFile, services []*serviceDesc) {
+	hg.P()
+	hg.P("// HTTPPathParams returns each method's path-param values as strings so a")
+	hg.P("// gRPC/rpcx call can be replayed as an HTTP curl without reflection.")
+	hg.P("var HTTPPathParams = map[string]http.PathParamFunc{")
+	for _, svc := range services {
+		for _, m := range svc.Methods {
+			if len(m.PathParams) == 0 {
+				continue
+			}
+			recv := hg.QualifiedGoIdent(protogen.GoIdent{
+				GoImportPath: m.RequestImport,
+				GoName:       m.RequestType,
+			})
+			hg.P(strconv.Quote(svc.ServiceName+"/"+m.Name) + ": func(m any) map[string]string {")
+			hg.P("\tx := m.(*" + recv + ")")
+			hg.P("\treturn map[string]string{")
+			for _, p := range m.PathParams {
+				hg.P("\t\t" + strconv.Quote(p.ProtoName) + ": " + p.ValueExpr + ",")
+			}
+			hg.P("\t}")
+			hg.P("},")
+		}
+	}
+	hg.P("}")
+	hg.P()
+	hg.P("func init() { http.RegisterPathParams(HTTPPathParams) }")
+}
+
+// needStrconvImport reports whether any generated bind statement or replay value
+// expression uses strconv.
+func needStrconvImport(services []*serviceDesc) bool {
+	for _, svc := range services {
+		for _, m := range svc.Methods {
+			for _, p := range m.PathParams {
+				if strings.Contains(p.BindStmt, "strconv.") || strings.Contains(p.ValueExpr, "strconv.") {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/neo532/gofr/transport"
 )
@@ -39,17 +40,6 @@ type testSvc struct{}
 
 func (s testSvc) SayHello(ctx context.Context, req *helloReq) (*helloReply, error) {
 	return &helloReply{Message: "Hello " + req.Name}, nil
-}
-
-// testServiceDesc for RegisterService backward-compat test.
-var testServiceDesc = &transport.ServiceDesc{
-	Name: "test.Greeter",
-	Methods: []transport.MethodDesc{
-		{
-			Name:       "SayHello",
-			NewRequest: func() any { return &helloReq{} },
-		},
-	},
 }
 
 func startGRPCServer(t *testing.T, srv *Server) (addr string, stop func()) {
@@ -112,6 +102,48 @@ func TestGRPCRegisterServiceWith(t *testing.T) {
 	invoke(t, conn, "/test.Greeter/SayHello", &helloReq{Name: "World"}, reply)
 	if reply.Message != "Hello World" {
 		t.Fatalf("got %q, want %q", reply.Message, "Hello World")
+	}
+}
+
+func TestGRPCClientIP(t *testing.T) {
+	srv := NewServer(Address(":0"))
+	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
+		Name    string
+		NewReq  func() any
+		Handler UnaryHandler
+	}{
+		{
+			Name:   "ClientIP",
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
+				tr, _ := transport.FromServerContext(ctx)
+				return &helloReply{Message: tr.ClientIP()}, nil
+			},
+		},
+	})
+
+	addr, stop := startGRPCServer(t, srv)
+	defer stop()
+	_, port, _ := net.SplitHostPort(addr)
+
+	conn := dialGRPC(t, "127.0.0.1:"+port)
+	reply := &helloReply{}
+
+	// Default simple mode: x-forwarded-for metadata honored.
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "x-forwarded-for", "203.0.113.7")
+	if err := conn.Invoke(ctx, "/test.Greeter/ClientIP", &helloReq{}, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message != "203.0.113.7" {
+		t.Fatalf("XFF: got %q, want %q", reply.Message, "203.0.113.7")
+	}
+
+	// No metadata → direct peer address.
+	if err := conn.Invoke(context.Background(), "/test.Greeter/ClientIP", &helloReq{}, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message != "127.0.0.1" {
+		t.Fatalf("RemoteAddr: got %q, want %q", reply.Message, "127.0.0.1")
 	}
 }
 
@@ -197,21 +229,6 @@ func TestGRPCUseWith(t *testing.T) {
 	mu.Unlock()
 	if !ok {
 		t.Fatal("UseWith middleware was not called")
-	}
-}
-
-func TestGRPCRegisterService(t *testing.T) {
-	srv := NewServer(Address(":0"))
-	RegisterService(srv, testServiceDesc, &testSvc{})
-
-	addr, stop := startGRPCServer(t, srv)
-	defer stop()
-
-	conn := dialGRPC(t, addr)
-	reply := &helloReply{}
-	invoke(t, conn, "/test.Greeter/SayHello", &helloReq{Name: "Compat"}, reply)
-	if reply.Message != "Hello Compat" {
-		t.Fatalf("got %q, want %q", reply.Message, "Hello Compat")
 	}
 }
 

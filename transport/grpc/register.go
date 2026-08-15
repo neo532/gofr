@@ -2,12 +2,12 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"reflect"
+	"net/url"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
@@ -21,9 +21,24 @@ func Address(addr string) ServerOption {
 	return func(s *Server) { s.address = addr }
 }
 
+// EndpointHost sets the advertised host for registration (the IP clients use
+// to reach this instance). When unset, Endpoint falls back to the local IP.
+func EndpointHost(host string) ServerOption {
+	return func(s *Server) { s.endpointHost = host }
+}
+
 // Middleware registers global middlewares applied to all methods.
 func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
+}
+
+// TrustedProxies configures the reverse-proxy address ranges whose
+// X-Forwarded-For / X-Real-IP metadata ClientIP will trust (see
+// transport.ClientIP). When unset, metadata from any peer is trusted.
+func TrustedProxies(cidrs ...string) ServerOption {
+	return func(s *Server) {
+		s.trustedProxies = append(s.trustedProxies, transport.ParseTrustedProxies(cidrs...)...)
+	}
 }
 
 // GrpcOptions passes raw grpc.ServerOption to the underlying grpc.Server.
@@ -39,13 +54,21 @@ func WithListener(lis net.Listener) ServerOption {
 // SetListener implements transport.ListenerServer for external listener injection.
 func (s *Server) SetListener(lis net.Listener) { s.lis = lis }
 
+// App injects the App so each request's Transporter can reach shared
+// application resources (logger, etc.). Called by gofr.App.Run.
+func (s *Server) App(a transport.App) { s.app = a }
+
 // Server wraps grpc.Server and implements transport.Server with middleware.
 type Server struct {
 	*grpc.Server
-	address   string
-	lis       net.Listener
-	mwManager *MiddlewareManager
-	grpcOpts  []grpc.ServerOption
+	address        string
+	endpointHost   string
+	lis            net.Listener
+	ready          chan struct{}
+	mwManager      *MiddlewareManager
+	grpcOpts       []grpc.ServerOption
+	trustedProxies []*net.IPNet
+	app            transport.App
 }
 
 // Addr returns the actual listening address, available after Start.
@@ -56,10 +79,19 @@ func (s *Server) Addr() string {
 	return s.address
 }
 
+// Ready returns a channel closed once the listener is bound.
+func (s *Server) Ready() <-chan struct{} { return s.ready }
+
+// Endpoint returns the advertised endpoint for service registration.
+func (s *Server) Endpoint() (*url.URL, error) {
+	return transport.EndpointURL("grpc", s.address, s.endpointHost)
+}
+
 // NewServer creates a gRPC server with gofr options.
 func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
 		mwManager: newMiddlewareManager(),
+		ready:     make(chan struct{}),
 	}
 	for _, o := range opts {
 		o(s)
@@ -88,10 +120,15 @@ func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
 		replyMD := make(metadata.MD)
 
 		tr := &Transport{
-			endpoint:    s.address,
-			operation:   info.FullMethod,
-			reqHeader:   headerCarrier(incomingMD),
-			replyHeader: headerCarrier(replyMD),
+			endpoint:       s.address,
+			operation:      info.FullMethod,
+			reqHeader:      headerCarrier(incomingMD),
+			replyHeader:    headerCarrier(replyMD),
+			trustedProxies: s.trustedProxies,
+			app:            s.app,
+		}
+		if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
+			tr.peer = p.Addr.String()
 		}
 
 		// Pre-register reply headers so modifications via Tr.ReplyHeader() are
@@ -118,6 +155,8 @@ func (s *Server) Start(ctx context.Context) error {
 			return err
 		}
 	}
+	close(s.ready)
+	transport.LogListen(ctx, s.app, s.lis, transport.KindGRPC)
 
 	go func() {
 		<-ctx.Done()
@@ -188,54 +227,3 @@ func RegisterServiceWith(s *Server, serviceName string, svr any, methods []struc
 	s.Server.RegisterService(desc, svr)
 }
 
-// RegisterService registers a service from transport.ServiceDesc onto the gRPC server.
-// MethodByName runs at registration time (startup), not per-request — only reflect.Call remains.
-func RegisterService(srv *Server, desc *transport.ServiceDesc, svr any) {
-	grpcDesc := &grpc.ServiceDesc{
-		ServiceName: desc.Name,
-		HandlerType: (*any)(nil),
-	}
-	for _, m := range desc.Methods {
-		md := m
-		fullMethod := fmt.Sprintf("/%s/%s", desc.Name, md.Name)
-
-		// Pre-resolve method at startup — no per-request MethodByName.
-		srvVal := reflect.ValueOf(svr)
-		method := srvVal.MethodByName(md.Name)
-		transport.ValidateServiceMethod(desc.Name, md.Name, method, &md)
-
-		grpcDesc.Methods = append(grpcDesc.Methods, grpc.MethodDesc{
-			MethodName: md.Name,
-			Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
-				req := md.NewRequest()
-				if err := dec(req); err != nil {
-					return nil, err
-				}
-				if interceptor != nil {
-					info := &grpc.UnaryServerInfo{
-						Server:     srv,
-						FullMethod: fullMethod,
-					}
-					return interceptor(ctx, req, info, func(ctx context.Context, req any) (any, error) {
-						return callMethod(method, ctx, req)
-					})
-				}
-				return callMethod(method, ctx, req)
-			},
-		})
-	}
-	srv.Server.RegisterService(grpcDesc, svr)
-}
-
-// callMethod dispatches with a pre-resolved method value — no MethodByName at request time.
-func callMethod(method reflect.Value, ctx context.Context, req any) (any, error) {
-	results := method.Call([]reflect.Value{
-		reflect.ValueOf(ctx),
-		reflect.ValueOf(req),
-	})
-	var err error
-	if len(results) > 1 && !results[1].IsNil() {
-		err = results[1].Interface().(error)
-	}
-	return results[0].Interface(), err
-}

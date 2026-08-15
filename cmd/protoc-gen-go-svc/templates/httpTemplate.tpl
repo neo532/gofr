@@ -1,5 +1,18 @@
-// Use RegisterHTTPServer to register services.
-// For per-service registration: RegisterService(s, {{(index .Services 0).ServiceType}}Desc, svr)
+{{- range $svc := .Services}}
+func _register{{$svc.ServiceType}}HTTP(s *http.Server, svr {{$svc.ServiceType}}) {
+	{{- range $m := $svc.Methods}}
+	http.RegisterUnary(s, "{{$m.HTTPMethod}}", "{{$m.RouterPath}}", svr.{{$m.Name}}, func(ctx http.Context, req *{{$m.Request}}) error {
+		if err := ctx.Bind(req); err != nil {
+			return err
+		}
+		{{- range $p := $m.PathParams}}
+		{{$p.BindStmt}}
+		{{- end}}
+		return nil
+	})
+	{{- end}}
+}
+{{end}}
 
 // RegisterHTTPServer registers all services to the HTTP server.
 // It matches each svr to its service descriptor by the concrete type name.
@@ -20,7 +33,7 @@ func RegisterHTTPServer(s *http.Server, svrs ...any) {
 		{{- range $svc := .Services}}
 		case "{{$svc.ServiceType}}":
 			matched["{{$svc.ServiceType}}"] = true
-			http.RegisterService(s, {{$svc.ServiceType}}Desc, svr)
+			_register{{$svc.ServiceType}}HTTP(s, svr.({{$svc.ServiceType}}))
 		{{- end}}
 		default:
 			fallbackRegisterHTTPServer(s, svr, matched)
@@ -39,7 +52,7 @@ func fallbackRegisterHTTPServer(s *http.Server, svr any, matched map[string]bool
 	{{- range $svc := .Services}}
 	case {{$svc.ServiceType}}:
 		matched["{{$svc.ServiceType}}"] = true
-		http.RegisterService(s, {{$svc.ServiceType}}Desc, v)
+		_register{{$svc.ServiceType}}HTTP(s, v)
 	{{- end}}
 	}
 }

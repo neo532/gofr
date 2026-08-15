@@ -8,6 +8,8 @@ require (
 )
 
 require (
+	github.com/neo532/gokit v1.0.40 // indirect
+	go.opentelemetry.io/otel v1.45.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect

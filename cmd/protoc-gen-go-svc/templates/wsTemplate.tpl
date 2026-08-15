@@ -1,16 +1,16 @@
 {{range $svc := .Services}}
 func _register{{$svc.ServiceType}}WebSocket(s *websocket.Server, svr {{$svc.ServiceType}}) {
-	{{range $svc.Methods}}
-	s.Handle("/{{$svc.ServiceName}}/{{.Name}}", func(ctx context.Context, conn *websocket.Conn) error {
+	{{range $m := $svc.Methods}}
+	s.Handle("{{$m.HTTPMethod}}", "{{$m.RouterPath}}", func(ctx context.Context, conn *websocket.Conn) error {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return err
 		}
-		req := &{{.Request}}{}
+		req := &{{$m.Request}}{}
 		if err := proto.Unmarshal(data, req); err != nil {
 			return err
 		}
-		resp, err := svr.{{.Name}}(ctx, req)
+		resp, err := svr.{{$m.Name}}(ctx, req)
 		if err != nil {
 			return err
 		}

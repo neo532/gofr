@@ -3,6 +3,7 @@ package gofr
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -12,23 +13,34 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/upgrader"
+	"github.com/neo532/gokit/logger"
 )
 
 // App manages server lifecycle.
 type App struct {
-	opts   *options
-	cancel context.CancelFunc
+	opts     *options
+	cancel   context.CancelFunc
+	instance *registry.ServiceInstance
+}
+
+// Logger returns the application logger.
+func (a *App) Logger() logger.ILogger {
+	return a.opts.logger
 }
 
 // New creates an App.
 func New(opts ...Option) (a *App) {
 	o := &options{
-		ctx:         context.Background(),
-		sigs:        []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT},
-		stopTimeout: 10 * time.Second,
-		pidFile:     "./pid",
+		ctx:              context.Background(),
+		sigs:             []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT},
+		stopTimeout:      10 * time.Second,
+		registrarTimeout: 10 * time.Second,
+		readyTimeout:     30 * time.Second,
+		pidFile:          "./pid",
+		logger:           logger.NewDefaultILogger(),
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -58,6 +70,11 @@ func (a *App) Run() error {
 		}
 	}
 
+	// inject the App into servers so they can reach shared resources (logger, etc.)
+	for _, srv := range a.opts.servers {
+		srv.App(a)
+	}
+
 	// beforeStart hooks
 	for _, fn := range a.opts.beforeStart {
 		if err := fn(ctx); err != nil {
@@ -77,6 +94,25 @@ func (a *App) Run() error {
 		eg.Go(func() error {
 			return s.Start(ctx)
 		})
+	}
+
+	// Wait until every server's listener is bound, then register. A server that
+	// failed to start cancels ctx, so waitReady returns and eg.Wait surfaces the
+	// real error; a server that never signals ready (listener stuck) times out.
+	if err := a.waitReady(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			if werr := eg.Wait(); werr != nil && !errors.Is(werr, context.Canceled) {
+				return werr
+			}
+			return nil
+		}
+		a.cancel()
+		return err
+	}
+
+	if err := a.register(); err != nil {
+		a.cancel()
+		return err
 	}
 
 	// afterStart hooks
@@ -138,7 +174,7 @@ func (a *App) Run() error {
 			return err
 		}
 	}
-	return nil
+	return a.unregister()
 }
 
 // Stop gracefully stops the application.
@@ -150,6 +186,105 @@ func (a *App) Stop() error {
 	}
 	a.cancel()
 	return nil
+}
+
+// waitReady blocks until every ReadyServer has bound its listener, so a
+// registration never outlives a server that failed to start. When a server
+// errors, the errgroup cancels ctx and this returns ctx.Err(); when a server
+// never signals ready within readyTimeout, it returns a timeout error.
+func (a *App) waitReady(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, a.opts.readyTimeout)
+	defer cancel()
+	for _, srv := range a.opts.servers {
+		rs, ok := srv.(transport.ReadyServer)
+		if !ok {
+			continue
+		}
+		select {
+		case <-rs.Ready():
+		case <-ctx.Done():
+			return fmt.Errorf("wait ready for %T: %w", srv, ctx.Err())
+		}
+	}
+	return nil
+}
+
+// register builds the service instance from the servers' advertised endpoints
+// and registers it. The registrar owns the lease-renewal heartbeat, so a crash
+// clears the entry via lease expiry. A failed registration aborts startup.
+func (a *App) register() error {
+	if a.opts.registrar == nil {
+		return nil
+	}
+	inst, err := a.buildInstance()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(a.opts.ctx, a.opts.registrarTimeout)
+	defer cancel()
+	if err := a.opts.registrar.Register(ctx, inst); err != nil {
+		return fmt.Errorf("register %s: %w", inst.Name, err)
+	}
+	a.instance = inst
+	return nil
+}
+
+// unregister deregisters the instance and closes the registrar, releasing the
+// connection it owns. It runs during shutdown, when a.opts.ctx has already been
+// cancelled by Stop, so it derives its own uncancelled context.
+func (a *App) unregister() error {
+	if a.opts.registrar == nil {
+		return nil
+	}
+	var err error
+	if a.instance != nil {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(a.opts.ctx), a.opts.registrarTimeout)
+		defer cancel()
+		err = a.opts.registrar.Deregister(ctx, a.instance)
+	}
+	if cerr := a.opts.registrar.Close(); cerr != nil && err == nil {
+		err = cerr
+	}
+	return err
+}
+
+// buildInstance assembles the ServiceInstance from each server's advertised
+// endpoint. The instance ID falls back to hostname:pid when not configured.
+func (a *App) buildInstance() (*registry.ServiceInstance, error) {
+	group := a.opts.group
+	if group == "" {
+		group = registry.DefaultGroup
+	}
+	inst := &registry.ServiceInstance{
+		Name:      a.opts.name,
+		Version:   a.opts.version,
+		Group:     group,
+		Protocol:  a.opts.protocol,
+		Weight:    a.opts.weight,
+		Metadata:  a.opts.metadata,
+		Endpoints: []string{},
+	}
+	if a.opts.id != "" {
+		inst.ID = a.opts.id
+	} else {
+		host, err := os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+		inst.ID = host + ":" + strconv.Itoa(os.Getpid())
+	}
+	for _, srv := range a.opts.servers {
+		ep, ok := srv.(transport.Endpointer)
+		if !ok {
+			continue
+		}
+		u, err := ep.Endpoint()
+		if err != nil {
+			return nil, fmt.Errorf("endpoint %T: %w", srv, err)
+		}
+		inst.Endpoints = append(inst.Endpoints, u.String())
+	}
+	return inst, nil
 }
 
 func (a *App) WritePID() (err error) {

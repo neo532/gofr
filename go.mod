@@ -1,8 +1,8 @@
 module github.com/neo532/gofr
 
-go 1.23.1
+go 1.25.0
 
 require (
-	github.com/neo532/gokit v1.0.40
+	github.com/neo532/gokit v1.0.48
 	golang.org/x/sync v0.20.0
 )

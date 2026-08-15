@@ -1,19 +1,25 @@
 package main
 
+import "google.golang.org/protobuf/compiler/protogen"
+
 // paramBinding maps a path parameter name to its Go struct field.
 type paramBinding struct {
 	ProtoName string // "name"
 	GoField   string // "Name"
+	BindStmt  string // complete statement binding ctx.PathValue into the request, e.g. "req.Id, _ = strconv.ParseInt(ctx.PathValue(\"id\"), 10, 64)"
+	ValueExpr string // Go expression yielding the param's string value from the request, e.g. "strconv.FormatInt(m.GetId(), 10)"
 }
 
 type methodDesc struct {
-	Name       string
-	Request    string
-	Reply      string
-	HTTPMethod string
-	HTTPPath   string
-	RouterPath string        // {param} → :param for httprouter
-	PathParams []paramBinding
+	Name          string
+	Request       string
+	RequestType   string                 // Go type name of the request message, e.g. "ByIdRequest"
+	RequestImport protogen.GoImportPath  // import path of the request message's package
+	Reply         string
+	HTTPMethod    string
+	HTTPPath      string
+	RouterPath    string        // {param} → :param for httprouter
+	PathParams    []paramBinding
 }
 
 type serviceDesc struct {

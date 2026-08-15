@@ -5,6 +5,10 @@ use (
 	./cmd/protoc-gen-go-client
 	./cmd/protoc-gen-go-svc
 	./example/helloworld
+	./middleware/trace
+	./middleware/trace/integration
+	./registry/redis
+	./registry/etcd
 	./transport/grpc
 	./transport/http
 	./transport/rpcx

@@ -2,8 +2,6 @@ package http
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -21,16 +19,33 @@ type Context interface {
 	Response() http.ResponseWriter
 	PathValue(key string) string
 	Query() url.Values
+	ClientIP() string
 	Bind(any) error
-	JSON(int, any) error
-	String(int, string) error
 	Result(int, any) error
 	Middleware(transport.Handler) transport.Handler
 }
 
+// responseWriter buffers the status code until the first Write, so the
+// encoder never needs to know the code: Result records it here and the
+// header is only sent once the body is written.
+type responseWriter struct {
+	code int
+	w    http.ResponseWriter
+}
+
+func (w *responseWriter) Header() http.Header        { return w.w.Header() }
+func (w *responseWriter) WriteHeader(statusCode int) { w.code = statusCode }
+func (w *responseWriter) Write(data []byte) (int, error) {
+	w.w.WriteHeader(w.code)
+	return w.w.Write(data)
+}
+
+func (w *responseWriter) Unwrap() http.ResponseWriter { return w.w }
+
 type wrapper struct {
 	req    *http.Request
 	res    http.ResponseWriter
+	w      responseWriter
 	srv    *Server
 	codec  DecodeRequestFunc
 	params httprouter.Params
@@ -48,21 +63,18 @@ func (c *wrapper) PathValue(key string) string     { return c.params.ByName(key)
 func (c *wrapper) Query() url.Values               { return c.req.URL.Query() }
 func (c *wrapper) Bind(v any) error        { return c.codec(c.req, v) }
 
-func (c *wrapper) JSON(code int, v any) error {
-	c.res.Header().Set("Content-Type", "application/json")
-	c.res.WriteHeader(code)
-	return json.NewEncoder(c.res).Encode(v)
-}
-
-func (c *wrapper) String(code int, text string) error {
-	c.res.Header().Set("Content-Type", "text/plain")
-	c.res.WriteHeader(code)
-	_, err := io.WriteString(c.res, text)
-	return err
+// ClientIP returns the real client IP, delegating to the request's Transporter.
+func (c *wrapper) ClientIP() string {
+	tr, _ := transport.FromServerContext(c.req.Context())
+	if tr != nil {
+		return tr.ClientIP()
+	}
+	return ""
 }
 
 func (c *wrapper) Result(code int, v any) error {
-	return c.srv.enc(c.res, c.req, v)
+	c.w.WriteHeader(code)
+	return c.srv.enc(&c.w, c.req, v)
 }
 
 func (c *wrapper) Middleware(userHandler transport.Handler) transport.Handler {

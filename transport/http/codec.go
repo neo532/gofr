@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
+
+	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gokit/errorx"
 )
 
 // Codec represents a pair of request decoder and response encoder for a content type.
 type Codec struct {
-	ContentType string               // e.g. "application/json"
+	ContentType string // e.g. "application/json"
 	Decode      func([]byte, any) error
 	Encode      func(any) ([]byte, error)
 }
@@ -86,6 +90,7 @@ func DefaultResponseEncoder(w http.ResponseWriter, r *http.Request, v any) error
 	w.Header().Set("Content-Type", c.ContentType)
 	if v == nil {
 		w.WriteHeader(http.StatusNoContent)
+		_, _ = w.Write(nil)
 		return nil
 	}
 	data, err := c.Encode(v)
@@ -108,4 +113,16 @@ func DefaultErrorEncoder(w http.ResponseWriter, r *http.Request, err error) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"error": err.Error(),
 	})
+}
+
+// DefaultPanicHandler logs the panic stack via the Transporter's App logger
+// when available, then responds through the server's ErrorEncoder so the
+// client gets the standard error response.
+func (s *Server) DefaultPanicHandler(w http.ResponseWriter, r *http.Request, v any) {
+	if tr, ok := transport.FromServerContext(r.Context()); ok {
+		if app := tr.App(); app != nil {
+			app.Logger().Error(r.Context(), "panic", "value", v, "stack", string(debug.Stack()))
+		}
+	}
+	s.ene(w, r, errorx.New("panic"))
 }

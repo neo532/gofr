@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gokit/logger"
 )
@@ -17,6 +18,9 @@ type options struct {
 	name     string
 	version  string
 	metadata map[string]string
+	group    string
+	protocol string
+	weight   int
 
 	ctx  context.Context
 	sigs []os.Signal
@@ -34,9 +38,9 @@ type options struct {
 	enableUpgrader bool
 	pidFile        string
 
-	// endpoints []*url.URL
-	// registrar        registry.Registrar
-	// registrarTimeout time.Duration
+	registrar        registry.Registrar
+	registrarTimeout time.Duration
+	readyTimeout     time.Duration
 }
 
 func ID(id string) Option {
@@ -53,6 +57,24 @@ func Version(v string) Option {
 
 func Metadata(md map[string]string) Option {
 	return func(o *options) { o.metadata = md }
+}
+
+// Group sets the registration group the instance registers under. Empty
+// defaults to registry.DefaultGroup; a developer sets their own name so local
+// instances override the shared pool (see registry.Discovery.WithGroup).
+func Group(g string) Option {
+	return func(o *options) { o.group = g }
+}
+
+// Protocol sets the caller protocol this instance advertises (e.g. "rpcx"),
+// letting consumers pick the matching endpoint without per-service config.
+func Protocol(p string) Option {
+	return func(o *options) { o.protocol = p }
+}
+
+// Weight sets the load-balancing weight for this instance; 0 means default.
+func Weight(w int) Option {
+	return func(o *options) { o.weight = w }
 }
 
 func Context(ctx context.Context) Option {
@@ -73,6 +95,21 @@ func Logger(l logger.ILogger) Option {
 
 func Server(srv ...transport.Server) Option {
 	return func(o *options) { o.servers = append(o.servers, srv...) }
+}
+
+// Registrar sets the service registry the App registers into on startup.
+func Registrar(reg registry.Registrar) Option {
+	return func(o *options) { o.registrar = reg }
+}
+
+// RegistrarTimeout bounds the synchronous Register/Deregister calls.
+func RegistrarTimeout(d time.Duration) Option {
+	return func(o *options) { o.registrarTimeout = d }
+}
+
+// ReadyTimeout bounds how long the App waits for servers to signal ready.
+func ReadyTimeout(d time.Duration) Option {
+	return func(o *options) { o.readyTimeout = d }
 }
 
 func BeforeStart(fn func(context.Context) error) Option {

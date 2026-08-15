@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/neo532/gofr/transport"
@@ -8,9 +9,12 @@ import (
 
 // wsTransport implements transport.Transporter for WebSocket connections.
 type wsTransport struct {
-	endpoint  string
-	operation string
-	reqHeader headerCarrier
+	endpoint       string
+	operation      string
+	reqHeader      headerCarrier
+	peer           string
+	trustedProxies []*net.IPNet
+	app            transport.App
 }
 
 func (t *wsTransport) Kind() transport.Kind          { return transport.KindWebSocket }
@@ -18,6 +22,10 @@ func (t *wsTransport) Endpoint() string               { return t.endpoint }
 func (t *wsTransport) Operation() string               { return t.operation }
 func (t *wsTransport) RequestHeader() transport.Header  { return t.reqHeader }
 func (t *wsTransport) ReplyHeader() transport.Header    { return nil }
+func (t *wsTransport) App() transport.App              { return t.app }
+func (t *wsTransport) ClientIP() string {
+	return transport.ClientIP(t.peer, t.reqHeader.Get, t.trustedProxies)
+}
 
 // headerCarrier adapts http.Header to transport.Header.
 type headerCarrier http.Header
