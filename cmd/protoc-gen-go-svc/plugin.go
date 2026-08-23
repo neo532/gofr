@@ -84,6 +84,7 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 			} else {
 				routerPath = toHTTPRouterPath(routerPath)
 			}
+			pp := enrichPathParams(method, extractPathParams(httpPath))
 			sd.Methods = append(sd.Methods, methodDesc{
 				Name:          method.GoName,
 				Request:       g.QualifiedGoIdent(method.Input.GoIdent),
@@ -93,7 +94,8 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 				HTTPMethod:    httpMethod,
 				HTTPPath:      httpPath,
 				RouterPath:    routerPath,
-				PathParams:    enrichPathParams(method, extractPathParams(httpPath)),
+				PathParams:    pp,
+				NeedsErrVar:   needsErrVar(pp),
 			})
 		}
 		services = append(services, sd)
@@ -123,15 +125,27 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 			GoImportPath: "reflect",
 			GoName:       "Type",
 		})
-		for _, svc := range file.Services {
-			for _, method := range svc.Methods {
-				hg.QualifiedGoIdent(method.Input.GoIdent)
+		// The HTTP decoder only references the request type when the route has
+		// path params; otherwise the decoder is nil and the import would be unused.
+		for _, svc := range services {
+			for _, m := range svc.Methods {
+				if len(m.PathParams) > 0 {
+					hg.QualifiedGoIdent(protogen.GoIdent{
+						GoImportPath: m.RequestImport,
+					})
+				}
 			}
 		}
 		if needStrconvImport(services) {
 			hg.QualifiedGoIdent(protogen.GoIdent{
 				GoImportPath: "strconv",
 				GoName:       "ParseInt",
+			})
+		}
+		if hasPathParams(services) {
+			hg.QualifiedGoIdent(protogen.GoIdent{
+				GoImportPath: "github.com/julienschmidt/httprouter",
+				GoName:       "Params",
 			})
 		}
 
@@ -358,7 +372,7 @@ func enrichPathParams(method *protogen.Method, params []paramBinding) []paramBin
 		p := &params[i]
 		f := findFieldByName(method.Input, p.ProtoName)
 		if f == nil {
-			p.BindStmt = fmt.Sprintf("req.%s = ctx.PathValue(%q)", p.GoField, p.ProtoName)
+			p.BindStmt = fmt.Sprintf("req.%s = ps.ByName(%q)", p.GoField, p.ProtoName)
 			p.ValueExpr = `""`
 			continue
 		}
@@ -409,29 +423,31 @@ func findFieldByName(msg *protogen.Message, name string) *protogen.Field {
 }
 
 // pathBindStmt builds the assignment that copies a path value into the request
-// field, converting to the field's Go type without reflection.
+// field. string fields bind directly from httprouter.Params (zero dispatch);
+// numeric/bool fields go through http.Parse[T], which type-switches once and
+// returns an error on a malformed value.
 func pathBindStmt(goField, protoName string, f *protogen.Field) string {
-	cv := "ctx.PathValue(" + strconv.Quote(protoName) + ")"
 	get := "req." + goField
+	name := strconv.Quote(protoName)
 	switch f.Desc.Kind() {
 	case protoreflect.StringKind:
-		return fmt.Sprintf("%s = %s", get, cv)
+		return fmt.Sprintf("%s = ps.ByName(%s)", get, name)
 	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-		return fmt.Sprintf("%s, _ = strconv.ParseInt(%s, 10, 64)", get, cv)
+		return fmt.Sprintf("if %s, err = http.Parse[int64](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-		return fmt.Sprintf("if v, err := strconv.ParseInt(%s, 10, 32); err == nil { %s = int32(v) }", cv, get)
+		return fmt.Sprintf("if %s, err = http.Parse[int32](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		return fmt.Sprintf("%s, _ = strconv.ParseUint(%s, 10, 64)", get, cv)
+		return fmt.Sprintf("if %s, err = http.Parse[uint64](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-		return fmt.Sprintf("if v, err := strconv.ParseUint(%s, 10, 32); err == nil { %s = uint32(v) }", cv, get)
+		return fmt.Sprintf("if %s, err = http.Parse[uint32](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.DoubleKind:
-		return fmt.Sprintf("%s, _ = strconv.ParseFloat(%s, 64)", get, cv)
+		return fmt.Sprintf("if %s, err = http.Parse[float64](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.FloatKind:
-		return fmt.Sprintf("if v, err := strconv.ParseFloat(%s, 32); err == nil { %s = float32(v) }", cv, get)
+		return fmt.Sprintf("if %s, err = http.Parse[float32](ps.ByName(%s)); err != nil { return err }", get, name)
 	case protoreflect.BoolKind:
-		return fmt.Sprintf("%s, _ = strconv.ParseBool(%s)", get, cv)
+		return fmt.Sprintf("if %s, err = http.Parse[bool](ps.ByName(%s)); err != nil { return err }", get, name)
 	default:
-		return fmt.Sprintf("%s = %s", get, cv)
+		return fmt.Sprintf("%s = ps.ByName(%s)", get, name)
 	}
 }
 
@@ -442,6 +458,17 @@ func hasPathParams(services []*serviceDesc) bool {
 			if len(m.PathParams) > 0 {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// needsErrVar reports whether any path-param bind statement references err (i.e.
+// any non-string param), in which case the generated decoder declares it once.
+func needsErrVar(params []paramBinding) bool {
+	for _, p := range params {
+		if strings.Contains(p.BindStmt, "err") {
+			return true
 		}
 	}
 	return false
@@ -480,13 +507,79 @@ func emitHTTPPathParams(hg *protogen.GeneratedFile, services []*serviceDesc) {
 	hg.P("func init() { http.RegisterPathParams(HTTPPathParams) }")
 }
 
-// needStrconvImport reports whether any generated bind statement or replay value
-// expression uses strconv.
+// registryServiceName returns the name a service registers under in the
+// registry: the first segment of its proto package (user.api.userRole -> user).
+func registryServiceName(f *protogen.File) string {
+	pkg := string(f.Desc.Package())
+	if i := strings.Index(pkg, "."); i > 0 {
+		return pkg[:i]
+	}
+	return pkg
+}
+
+// serviceDir returns the service's top-level source directory from a proto
+// path (biz/user/api/userToken/userToken.proto -> biz/user).
+func serviceDir(protoPath string) string {
+	parts := strings.Split(protoPath, "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[0] + "/" + parts[1]
+}
+
+// emitRegistryServiceNames writes one file per service into the service's
+// top-level directory holding the name it registers under in the registry, so
+// consumers reference it instead of hardcoding it. Only the biz/{svc}/api
+// layout is aggregated; other layouts are left untouched.
+func emitRegistryServiceNames(gen *protogen.Plugin) {
+	var order []string
+	dirOf := map[string]string{}
+	ipOf := map[string]protogen.GoImportPath{}
+	for _, f := range gen.Files {
+		if !f.Generate || len(f.Services) == 0 {
+			continue
+		}
+		path := f.Desc.Path()
+		if !strings.HasPrefix(path, "biz/") {
+			continue
+		}
+		name := registryServiceName(f)
+		if name == "" {
+			continue
+		}
+		if _, ok := dirOf[name]; ok {
+			continue
+		}
+		dirOf[name] = serviceDir(path)
+		// Drop the trailing api/{api} segments to reach .../biz/{svc}.
+		segs := strings.Split(string(f.GoImportPath), "/")
+		ipOf[name] = protogen.GoImportPath(strings.Join(segs[:len(segs)-2], "/"))
+		order = append(order, name)
+	}
+	for _, name := range order {
+		dir := dirOf[name]
+		segs := strings.Split(dir, "/")
+		pkg := segs[len(segs)-1]
+		g := gen.NewGeneratedFile(dir+"/registry.pb.go", ipOf[name])
+		g.P("// Code generated by protoc-gen-go-svc. DO NOT EDIT.")
+		g.P("// source: ", name, " (registry service name)")
+		g.P()
+		g.P("package ", pkg)
+		g.P()
+		g.P("// ServiceName is the name this service registers under in the registry,")
+		g.P("// derived from the first segment of its proto package (user.api.* -> user).")
+		g.P("const ServiceName = ", strconv.Quote(name))
+		g.P()
+	}
+}
+
+// needStrconvImport reports whether any replay value expression uses strconv.
+// (HTTP decoders now go through http.PathParam, which needs no strconv import.)
 func needStrconvImport(services []*serviceDesc) bool {
 	for _, svc := range services {
 		for _, m := range svc.Methods {
 			for _, p := range m.PathParams {
-				if strings.Contains(p.BindStmt, "strconv.") || strings.Contains(p.ValueExpr, "strconv.") {
+				if strings.Contains(p.ValueExpr, "strconv.") {
 					return true
 				}
 			}

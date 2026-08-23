@@ -82,6 +82,17 @@ func (a *App) Run() error {
 		}
 	}
 
+	// Fail fast: the registry must be reachable before any listener binds, so an
+	// outage surfaces at startup instead of after servers accept traffic.
+	if a.opts.registrar != nil {
+		checkCtx, cancel := context.WithTimeout(ctx, a.opts.registrarTimeout)
+		if err := a.opts.registrar.Check(checkCtx); err != nil {
+			cancel()
+			return err
+		}
+		cancel()
+	}
+
 	// start servers
 	for _, srv := range a.opts.servers {
 		s := srv

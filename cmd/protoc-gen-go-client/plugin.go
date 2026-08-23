@@ -122,16 +122,14 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		g.P("package ", file.GoPackageName)
 		g.P()
 
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "bytes", GoName: "Buffer"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context", GoName: "Context"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "encoding/json", GoName: "Encoder"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "fmt", GoName: "Sprint"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "net/http", GoName: "Client"})
-
 		services := buildServices(func(id protogen.GoIdent) string {
 			return g.QualifiedGoIdent(id)
 		})
 
+		// Configure each method's HTTP binding and register request/reply
+		// imports. HasBody is computed here, before the import block below,
+		// because it decides whether the bytes import is emitted.
+		hasBody := false
 		for _, svc := range services {
 			for i := range svc.Methods {
 				m := svc.Methods[i]
@@ -156,6 +154,9 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 				svc.Methods[i].PathParams = params
 				svc.Methods[i].HTTPURL = buildURLExpr("baseURL", httpPath, params)
 				svc.Methods[i].HasBody = httpMethod == "POST" || httpMethod == "PUT" || httpMethod == "PATCH"
+				if svc.Methods[i].HasBody {
+					hasBody = true
+				}
 
 				// Register imports needed in closure signatures
 				for _, ps := range file.Services {
@@ -172,6 +173,16 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 				}
 			}
 		}
+
+		// bytes.Buffer is only emitted for methods with a request body; import it
+		// only then, or an all-GET service gets an unused bytes import.
+		if hasBody {
+			g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "bytes", GoName: "Buffer"})
+		}
+		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context", GoName: "Context"})
+		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "encoding/json", GoName: "Encoder"})
+		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "fmt", GoName: "Sprint"})
+		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "net/http", GoName: "Client"})
 
 		output := generateHTTPClient(pkg, services)
 		for _, line := range splitLines(output) {

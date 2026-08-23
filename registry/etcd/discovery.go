@@ -94,6 +94,15 @@ func (d *Discovery) Watch(ctx context.Context, name string) (registry.Watcher, e
 	return w, nil
 }
 
+// Check verifies the registry is reachable (fail-fast startup gate).
+func (d *Discovery) Check(ctx context.Context) error {
+	if len(d.client.Endpoints()) == 0 {
+		return errors.New("registry: no endpoints configured")
+	}
+	_, err := d.client.Status(ctx, d.client.Endpoints()[0])
+	return err
+}
+
 func (d *Discovery) Close() error {
 	return d.client.Close()
 }

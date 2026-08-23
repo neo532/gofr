@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,14 +15,6 @@ import (
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
-
-var wrapperPool = sync.Pool{
-	New: func() any { return &wrapper{} },
-}
-
-var transportPool = sync.Pool{
-	New: func() any { return &Transport{} },
-}
 
 // ServerOption configures the HTTP server.
 type ServerOption func(*Server)
@@ -93,14 +84,14 @@ func (s *Server) App(a transport.App) { s.app = a }
 
 // Server is an HTTP server wrapper based on httprouter.
 type Server struct {
-	router       *httprouter.Router
-	srv          atomic.Value // *http.Server, set in Start()
-	address      string
-	endpointHost string
-	timeout      time.Duration
-	tlsConf      *tls.Config
-	lis          net.Listener
-	ready        chan struct{}
+	router         *httprouter.Router
+	srv            atomic.Value // *http.Server, set in Start()
+	address        string
+	endpointHost   string
+	timeout        time.Duration
+	tlsConf        *tls.Config
+	lis            net.Listener
+	ready          chan struct{}
 	decBody        DecodeRequestFunc
 	enc            EncodeResponseFunc
 	ene            EncodeErrorFunc
@@ -154,33 +145,53 @@ func (s *Server) UseWith(operation string, m ...middleware.Middleware) {
 	s.mwManager.UseWith(operation, m...)
 }
 
-// Handle registers a handler function with method and httprouter path.
-// The Transporter is created and injected by the top-level handler in Start,
-// so it is reachable from r.Context() here and in the PanicHandler.
-func (s *Server) Handle(method, path string, handler func(Context) error) {
+// Handle registers a raw handler with method and httprouter path. The handler
+// receives the standard (w, r, ps) triple; path params are reachable via ps,
+// and the Transporter injected by the top-level handler in Start is available
+// from r.Context(). The route path is stamped onto the per-request Transport so
+// middleware and logging observe the route template, not just the matched URL.
+func (s *Server) Handle(method, path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.router.Handle(method, path, func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		tr := r.Context().Value(transport.ServerTransportKey{}).(*Transport)
-		tr.operation = path
+		if tr, ok := r.Context().Value(transport.ServerTransportKey{}).(*Transport); ok {
+			tr.operation = path
+		}
+		handler(w, r, ps)
+	})
+}
 
-		ctxw := wrapperPool.Get().(*wrapper)
-		ctxw.req = r
-		ctxw.res = w
-		ctxw.w = responseWriter{code: http.StatusOK, w: w}
-		ctxw.srv = s
-		ctxw.codec = s.decBody
-		ctxw.params = ps
+// HandleUnary registers a generated-style unary route. It decodes the request
+// body via the server's request decoder, applies path-param bindings via dec,
+// runs the pre-built middleware chain, then encodes the reply or error. dec may
+// be nil when the route carries no path params. This is the zero-reflection
+// path used by generated code. (Package-level because Go methods cannot declare
+// their own type parameters.)
+func HandleUnary[Req, Res any](
+	s *Server,
+	method, path string,
+	fn func(context.Context, *Req) (*Res, error),
+	dec func(httprouter.Params, *Req) error,
+) {
+	wrapped := func(ctx context.Context, req any) (any, error) { return fn(ctx, req.(*Req)) }
+	prebuilt := s.PrebuildHandler(path, transport.Handler(wrapped))
 
-		err := handler(ctxw)
+	s.Handle(method, path, func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		req := new(Req)
+		if err := s.decBody(r, req); err != nil {
+			s.ene(w, r, err)
+			return
+		}
+		if dec != nil {
+			if err := dec(ps, req); err != nil {
+				s.ene(w, r, err)
+				return
+			}
+		}
+		out, err := prebuilt(r.Context(), req)
 		if err != nil {
 			s.ene(w, r, err)
+			return
 		}
-
-		ctxw.req = nil
-		ctxw.res = nil
-		ctxw.w = responseWriter{}
-		ctxw.srv = nil
-		ctxw.params = nil
-		wrapperPool.Put(ctxw)
+		s.enc(w, r, out)
 	})
 }
 
@@ -190,27 +201,27 @@ func (s *Server) HandleHandler(method, path string, handler http.Handler) {
 }
 
 // GET registers a GET handler.
-func (s *Server) GET(path string, handler func(Context) error) {
+func (s *Server) GET(path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.Handle("GET", path, handler)
 }
 
 // POST registers a POST handler.
-func (s *Server) POST(path string, handler func(Context) error) {
+func (s *Server) POST(path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.Handle("POST", path, handler)
 }
 
 // PUT registers a PUT handler.
-func (s *Server) PUT(path string, handler func(Context) error) {
+func (s *Server) PUT(path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.Handle("PUT", path, handler)
 }
 
 // DELETE registers a DELETE handler.
-func (s *Server) DELETE(path string, handler func(Context) error) {
+func (s *Server) DELETE(path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.Handle("DELETE", path, handler)
 }
 
 // PATCH registers a PATCH handler.
-func (s *Server) PATCH(path string, handler func(Context) error) {
+func (s *Server) PATCH(path string, handler func(http.ResponseWriter, *http.Request, httprouter.Params)) {
 	s.Handle("PATCH", path, handler)
 }
 
@@ -233,31 +244,21 @@ func (s *Server) Start(ctx context.Context) error {
 	close(s.ready)
 	transport.LogListen(ctx, s.app, s.lis, transport.KindHTTP)
 
-	// Top-level wrapper creates the per-request Transporter and injects it into
-	// the request context before httprouter sees it. httprouter's PanicHandler
-	// recovers with the request it received here, so it stays reachable there.
+	// Each request gets a fresh Transport allocated and injected into its request
+	// context via context.WithValue. The context chain is immutable and GC'd with
+	// the request, so async goroutines that keep the context (e.g. gorm's
+	// Rows.awaitDone) can call FromServerContext at any time and always see a
+	// valid, fully-populated Transport — never a recycled one.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tr := transportPool.Get().(*Transport)
-		tr.reqHeader = headerCarrier(r.Header)
-		tr.replyHeader = headerCarrier(w.Header())
-		tr.peer = r.RemoteAddr
-		tr.trustedProxies = s.trustedProxies
-		tr.app = s.app
-		tr.req = r
-
+		tr := &Transport{
+			reqHeader:      headerCarrier(r.Header),
+			replyHeader:    headerCarrier(w.Header()),
+			peer:           r.RemoteAddr,
+			trustedProxies: s.trustedProxies,
+			app:            s.app,
+			req:            r,
+		}
 		r = r.WithContext(transport.NewServerContext(r.Context(), tr))
-
-		defer func() {
-			tr.operation = ""
-			tr.reqHeader = nil
-			tr.replyHeader = nil
-			tr.peer = ""
-			tr.trustedProxies = nil
-			tr.app = nil
-			tr.req = nil
-			transportPool.Put(tr)
-		}()
-
 		s.router.ServeHTTP(w, r)
 	})
 

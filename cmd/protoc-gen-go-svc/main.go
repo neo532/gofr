@@ -11,6 +11,7 @@ func main() {
 			}
 			generateFile(gen, f, protos)
 		}
+		emitRegistryServiceNames(gen)
 		return nil
 	})
 }

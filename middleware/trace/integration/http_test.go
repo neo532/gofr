@@ -21,11 +21,11 @@ type httpReply struct {
 
 func TestHTTPTracePropagation(t *testing.T) {
 	srv := ghttp.NewServer(ghttp.Address(":0"), ghttp.Middleware(gofrTrace.Server()))
-	ghttp.RegisterUnary(srv, "POST", "/trace",
+	ghttp.HandleUnary(srv, "POST", "/trace",
 		func(ctx context.Context, req *httpReq) (*httpReply, error) {
 			return &httpReply{Message: gofrTrace.TraceID(ctx)}, nil
 		},
-		func(ctx ghttp.Context, req *httpReq) error { return ctx.Bind(req) },
+		nil,
 	)
 
 	addr, stop := start(t, srv)

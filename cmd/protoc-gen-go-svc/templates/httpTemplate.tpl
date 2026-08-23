@@ -1,15 +1,15 @@
 {{- range $svc := .Services}}
 func _register{{$svc.ServiceType}}HTTP(s *http.Server, svr {{$svc.ServiceType}}) {
 	{{- range $m := $svc.Methods}}
-	http.RegisterUnary(s, "{{$m.HTTPMethod}}", "{{$m.RouterPath}}", svr.{{$m.Name}}, func(ctx http.Context, req *{{$m.Request}}) error {
-		if err := ctx.Bind(req); err != nil {
-			return err
-		}
+	http.HandleUnary(s, "{{$m.HTTPMethod}}", "{{$m.RouterPath}}", svr.{{$m.Name}}, {{if $m.PathParams}}func(ps httprouter.Params, req *{{$m.Request}}) error {
+		{{- if $m.NeedsErrVar}}
+		var err error
+		{{- end}}
 		{{- range $p := $m.PathParams}}
 		{{$p.BindStmt}}
 		{{- end}}
 		return nil
-	})
+	}{{else}}nil{{end}})
 	{{- end}}
 }
 {{end}}

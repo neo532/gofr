@@ -2,14 +2,21 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gokit/errorx"
+
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Codec represents a pair of request decoder and response encoder for a content type.
@@ -25,7 +32,12 @@ var (
 		"json": {
 			ContentType: "application/json",
 			Decode:      json.Unmarshal,
-			Encode:      json.Marshal,
+			Encode: func(v any) ([]byte, error) {
+				if pm, ok := v.(proto.Message); ok {
+					return protojson.MarshalOptions{UseEnumNumbers: true}.Marshal(pm)
+				}
+				return json.Marshal(v)
+			},
 		},
 	}
 )
@@ -70,14 +82,60 @@ type EncodeResponseFunc func(http.ResponseWriter, *http.Request, any) error
 // EncodeErrorFunc encodes an error into an HTTP response.
 type EncodeErrorFunc func(http.ResponseWriter, *http.Request, error)
 
-// DefaultRequestDecoder decodes request body based on Content-Type.
+// decodeQuery converts URL query params into JSON and decodes them into v.
+// Repeated fields must be emitted as JSON arrays (encoding/json does not
+// coerce a single scalar into a slice), so list fields are detected via the
+// proto descriptor; scalar fields get the single value.
+func decodeQuery(q url.Values, v any) error {
+	if len(q) == 0 {
+		return nil
+	}
+	m := make(map[string]any, len(q))
+	for k, vs := range q {
+		if isRepeatedField(v, k) {
+			m[k] = vs
+		} else if len(vs) == 1 {
+			m[k] = vs[0]
+		} else {
+			m[k] = vs
+		}
+	}
+	bt, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bt, v)
+}
+
+// isRepeatedField reports whether v is a proto message whose field matching
+// name (proto snake_case or JSON camelCase) is a list field. Non-proto values
+// have no field schema, so decodeQuery falls back to its array-vs-scalar
+// heuristic for them.
+func isRepeatedField(v any, name string) bool {
+	pm, ok := v.(proto.Message)
+	if !ok {
+		return false
+	}
+	fields := pm.ProtoReflect().Descriptor().Fields()
+	if fd := fields.ByName(protoreflect.Name(name)); fd != nil {
+		return fd.IsList()
+	}
+	if fd := fields.ByJSONName(name); fd != nil {
+		return fd.IsList()
+	}
+	return false
+}
+
+// DefaultRequestDecoder decodes request body based on Content-Type. When the
+// body is empty (typical GET), it falls back to decoding URL query params, so
+// ?key=a&key=b reaches handlers instead of being silently dropped.
 func DefaultRequestDecoder(r *http.Request, v any) error {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 	if len(data) == 0 {
-		return nil
+		return decodeQuery(r.URL.Query(), v)
 	}
 
 	c := matchCodec(r.Header.Get("Content-Type"))
@@ -125,4 +183,63 @@ func (s *Server) DefaultPanicHandler(w http.ResponseWriter, r *http.Request, v a
 		}
 	}
 	s.ene(w, r, errorx.New("panic"))
+}
+
+// Parse parses a single string as T. Supported T: string and the numeric/bool
+// scalars (int64/int32/uint64/uint32/float64/float32/bool). The type dispatch
+// is one interface box + one pointer-compare per call; for string it degrades
+// to a direct assignment. Callers pass the raw value, e.g. a path param
+// (Parse[int64](ps.ByName("id"))) or a query param
+// (Parse[string](r.URL.Query().Get("key"))).
+func Parse[T any](s string) (T, error) {
+	var zero T
+	switch p := any(&zero).(type) {
+	case *string:
+		*p = s
+	case *int64:
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return zero, err
+		}
+		*p = n
+	case *int32:
+		n, err := strconv.ParseInt(s, 10, 32)
+		if err != nil {
+			return zero, err
+		}
+		*p = int32(n)
+	case *uint64:
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return zero, err
+		}
+		*p = n
+	case *uint32:
+		n, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			return zero, err
+		}
+		*p = uint32(n)
+	case *float64:
+		n, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return zero, err
+		}
+		*p = n
+	case *float32:
+		n, err := strconv.ParseFloat(s, 32)
+		if err != nil {
+			return zero, err
+		}
+		*p = float32(n)
+	case *bool:
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return zero, err
+		}
+		*p = b
+	default:
+		return zero, fmt.Errorf("unsupported type %T", &zero)
+	}
+	return zero, nil
 }

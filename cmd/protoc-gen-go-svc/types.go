@@ -20,6 +20,7 @@ type methodDesc struct {
 	HTTPPath      string
 	RouterPath    string        // {param} → :param for httprouter
 	PathParams    []paramBinding
+	NeedsErrVar   bool          // any non-string path param → decoder declares `var err error`
 }
 
 type serviceDesc struct {

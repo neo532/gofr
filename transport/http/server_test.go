@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/neo532/gofr/transport"
 )
 
@@ -48,8 +50,8 @@ func startServer(t *testing.T, srv *Server) (addr string, stop func()) {
 
 func TestCustomRoute(t *testing.T) {
 	srv := NewServer(Address(":0"))
-	srv.GET("/hello/:Name", func(ctx Context) error {
-		return ctx.Result(200, map[string]string{"greeting": "hello " + ctx.PathValue("Name")})
+	srv.GET("/hello/:Name", func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		_ = srv.enc(w, r, map[string]string{"greeting": "hello " + ps.ByName("Name")})
 	})
 
 	addr, stop := startServer(t, srv)
@@ -70,19 +72,16 @@ func TestCustomRoute(t *testing.T) {
 	}
 }
 
-// TestRegisterUnaryPathParam mirrors the generated decoder shape:
+// TestHandleUnaryPathParam mirrors the generated decoder shape:
 // body binding plus int64 path-param injection, zero reflection.
-func TestRegisterUnaryPathParam(t *testing.T) {
+func TestHandleUnaryPathParam(t *testing.T) {
 	srv := NewServer(Address(":0"))
-	RegisterUnary(srv, "PUT", "/api/v1/user/:userId",
+	HandleUnary(srv, "PUT", "/api/v1/user/:userId",
 		func(ctx context.Context, req *helloReq) (*helloReply, error) {
 			return &helloReply{Message: fmt.Sprintf("id=%d name=%s", req.ID, req.Name)}, nil
 		},
-		func(ctx Context, req *helloReq) error {
-			if err := ctx.Bind(req); err != nil {
-				return err
-			}
-			req.ID, _ = strconv.ParseInt(ctx.PathValue("userId"), 10, 64)
+		func(ps httprouter.Params, req *helloReq) error {
+			req.ID, _ = strconv.ParseInt(ps.ByName("userId"), 10, 64)
 			return nil
 		},
 	)
@@ -122,9 +121,9 @@ func TestServerMiddleware(t *testing.T) {
 			}
 		}),
 	)
-	RegisterUnary(srv, "POST", "/test.Greeter/SayHello",
+	HandleUnary(srv, "POST", "/test.Greeter/SayHello",
 		(&testService{}).SayHello,
-		func(ctx Context, req *helloReq) error { return ctx.Bind(req) },
+		nil,
 	)
 
 	addr, stop := startServer(t, srv)
@@ -138,9 +137,9 @@ func TestServerMiddleware(t *testing.T) {
 	}
 }
 
-func TestRegisterHandler(t *testing.T) {
+func TestHandleUnary(t *testing.T) {
 	srv := NewServer(Address(":0"))
-	RegisterHandler(srv, "test.Greeter/SayHello", (&testService{}).SayHello)
+	HandleUnary(srv, "POST", "/test.Greeter/SayHello", (&testService{}).SayHello, nil)
 
 	addr, stop := startServer(t, srv)
 	defer stop()
@@ -168,8 +167,9 @@ func TestClientIP(t *testing.T) {
 	newServer := func(opts ...ServerOption) (addr string, stop func()) {
 		t.Helper()
 		srv := NewServer(append([]ServerOption{Address(":0")}, opts...)...)
-		srv.GET("/ip", func(ctx Context) error {
-			return ctx.Result(200, map[string]string{"ip": ctx.ClientIP()})
+		srv.GET("/ip", func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+			tr, _ := transport.FromServerContext(r.Context())
+			_ = srv.enc(w, r, map[string]string{"ip": tr.ClientIP()})
 		})
 		return startServer(t, srv)
 	}
@@ -228,12 +228,12 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
-func TestRegisterUnary(t *testing.T) {
+func TestHandleUnaryPath(t *testing.T) {
 	srv := NewServer(Address(":0"))
-	RegisterUnary(srv, "GET", "/api/v1/hello/:name",
+	HandleUnary(srv, "GET", "/api/v1/hello/:name",
 		(&testService{}).SayHello,
-		func(ctx Context, req *helloReq) error {
-			req.Name = ctx.PathValue("name")
+		func(ps httprouter.Params, req *helloReq) error {
+			req.Name = ps.ByName("name")
 			return nil
 		},
 	)

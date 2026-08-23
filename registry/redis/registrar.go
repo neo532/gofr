@@ -102,6 +102,11 @@ func (r *Registrar) Deregister(ctx context.Context, instance *registry.ServiceIn
 	return err
 }
 
+// Check verifies the registry is reachable (fail-fast startup gate).
+func (r *Registrar) Check(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
+}
+
 func (r *Registrar) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

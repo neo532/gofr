@@ -98,6 +98,11 @@ func (d *Discovery) Watch(ctx context.Context, name string) (registry.Watcher, e
 	return w, nil
 }
 
+// Check verifies the registry is reachable (fail-fast startup gate).
+func (d *Discovery) Check(ctx context.Context) error {
+	return d.client.Ping(ctx).Err()
+}
+
 func (d *Discovery) Close() error {
 	return d.client.Close()
 }

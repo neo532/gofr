@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -117,6 +118,15 @@ func (r *Registrar) Deregister(ctx context.Context, instance *registry.ServiceIn
 		r.client.Revoke(context.Background(), info.id)
 	}
 	_, err := r.client.Delete(ctx, key)
+	return err
+}
+
+// Check verifies the registry is reachable (fail-fast startup gate).
+func (r *Registrar) Check(ctx context.Context) error {
+	if len(r.client.Endpoints()) == 0 {
+		return errors.New("registry: no endpoints configured")
+	}
+	_, err := r.client.Status(ctx, r.client.Endpoints()[0])
 	return err
 }
 

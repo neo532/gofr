@@ -22,11 +22,11 @@ func TestMiddlewareSeesRawRequest(t *testing.T) {
 			return next(ctx, req)
 		}
 	}))
-	RegisterUnary(srv, "GET", "/raw",
+	HandleUnary(srv, "GET", "/raw",
 		func(ctx context.Context, req *helloReq) (*helloReply, error) {
 			return &helloReply{Message: "ok"}, nil
 		},
-		func(ctx Context, req *helloReq) error { return ctx.Bind(req) },
+		nil,
 	)
 
 	addr, stop := startServer(t, srv)
