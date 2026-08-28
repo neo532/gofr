@@ -2,15 +2,20 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
+	"github.com/neo532/gofr/transport/route"
 )
 
 // ServerOption configures the gRPC server.
@@ -32,12 +37,22 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// WithMiddlewareManager injects an external composite middleware manager,
+// letting business projects supply their own prefix/regex/exact matchers.
+// Globals registered via the Middleware option are carried over, so option
+// order does not matter.
+func WithMiddlewareManager(m *manager.MiddlewareManager) ServerOption {
+	return func(s *Server) {
+		s.mwManager = m.Use(s.mwManager.Global()...)
+	}
+}
+
 // TrustedProxies configures the reverse-proxy address ranges whose
 // X-Forwarded-For / X-Real-IP metadata ClientIP will trust (see
-// transport.ClientIP). When unset, metadata from any peer is trusted.
+// transport/ip.ClientIP). When unset, metadata from any peer is trusted.
 func TrustedProxies(cidrs ...string) ServerOption {
 	return func(s *Server) {
-		s.trustedProxies = append(s.trustedProxies, transport.ParseTrustedProxies(cidrs...)...)
+		s.trustedProxies = append(s.trustedProxies, ip.ParseTrustedProxies(cidrs...)...)
 	}
 }
 
@@ -65,7 +80,7 @@ type Server struct {
 	endpointHost   string
 	lis            net.Listener
 	ready          chan struct{}
-	mwManager      *MiddlewareManager
+	mwManager      *manager.MiddlewareManager
 	grpcOpts       []grpc.ServerOption
 	trustedProxies []*net.IPNet
 	app            transport.App
@@ -84,13 +99,23 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // Endpoint returns the advertised endpoint for service registration.
 func (s *Server) Endpoint() (*url.URL, error) {
-	return transport.EndpointURL("grpc", s.address, s.endpointHost)
+	host, port, err := net.SplitHostPort(s.address)
+	if err != nil {
+		return nil, fmt.Errorf("endpoint grpc: %q: %w", s.address, err)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = s.endpointHost
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = ip.LocalIP()
+	}
+	return &url.URL{Scheme: "grpc", Host: net.JoinHostPort(host, port)}, nil
 }
 
 // NewServer creates a gRPC server with gofr options.
 func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
-		mwManager: newMiddlewareManager(),
+		mwManager: manager.NewMiddlewareManager(),
 		ready:     make(chan struct{}),
 	}
 	for _, o := range opts {
@@ -108,9 +133,13 @@ func (s *Server) Use(m ...middleware.Middleware) {
 	s.mwManager.Use(m...)
 }
 
-// UseWith registers middlewares scoped to a specific method path (e.g. "/helloworld.Greeter/SayHello").
-func (s *Server) UseWith(method string, m ...middleware.Middleware) {
-	s.mwManager.UseWith(method, m...)
+// opFor resolves the HTTP-bound operation for a gRPC full method, falling back
+// to the full method name when the method has no google.api.http binding.
+func opFor(fullMethod string) (transport.Operation, string) {
+	if op, tmpl, ok := route.RouteOperation(fullMethod); ok {
+		return op, tmpl
+	}
+	return transport.Operation{Operation: fullMethod}, ""
 }
 
 // unaryServerInterceptor wraps the context with a Transporter carrying request/reply metadata.
@@ -119,9 +148,13 @@ func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
 		incomingMD, _ := metadata.FromIncomingContext(ctx)
 		replyMD := make(metadata.MD)
 
+		op, tmpl := opFor(info.FullMethod)
 		tr := &Transport{
 			endpoint:       s.address,
-			operation:      info.FullMethod,
+			operation:      op.Operation,
+			method:         op.Method,
+			routeKey:       strings.TrimPrefix(info.FullMethod, "/"),
+			pathTmpl:       tmpl,
 			reqHeader:      headerCarrier(incomingMD),
 			replyHeader:    headerCarrier(replyMD),
 			trustedProxies: s.trustedProxies,
@@ -130,6 +163,7 @@ func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
 		if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
 			tr.peer = p.Addr.String()
 		}
+		tr.SetReq(req)
 
 		// Pre-register reply headers so modifications via Tr.ReplyHeader() are
 		// automatically sent with the response.
@@ -141,8 +175,8 @@ func unaryServerInterceptor(s *Server) grpc.UnaryServerInterceptor {
 }
 
 // PrebuildHandler pre-computes middleware chain for a gRPC method.
-func (s *Server) PrebuildHandler(fullMethod string, fn transport.Handler) transport.Handler {
-	matched := s.mwManager.Match(fullMethod)
+func (s *Server) PrebuildHandler(op transport.Operation, fn middleware.Handler) middleware.Handler {
+	matched := s.mwManager.Match(op)
 	return middleware.Chain(matched...)(fn)
 }
 
@@ -156,7 +190,9 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	close(s.ready)
-	transport.LogListen(ctx, s.app, s.lis, transport.KindGRPC)
+	if s.app != nil {
+		s.app.Logger().Info(ctx, "listening on", transport.KindKey, transport.KindGRPC, "addr", s.lis.Addr().String())
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -187,13 +223,45 @@ func (s *Server) Stop(ctx context.Context) error {
 // Used by generated code for zero-reflection registration.
 type UnaryHandler func(ctx context.Context, req any) (any, error)
 
-// RegisterServiceWith registers a multi-method gRPC service with direct handlers.
-// Middleware is applied per method via PrebuildHandler.
+// ServiceMethod describes one method for zero-reflection registration. Stream
+// selects the streaming branch: the method registers as a grpc.StreamDesc and
+// StreamHandler drives the stream, with the direction flags describing its
+// shape for reflection. A pure-unary method leaves the stream fields zero.
+type ServiceMethod struct {
+	Name    string
+	NewReq  func() any
+	Handler UnaryHandler
+
+	Stream        bool
+	StreamHandler grpc.StreamHandler
+	ServerStreams bool
+	ClientStreams bool
+}
+
+// RegisterServiceWith registers a multi-method unary gRPC service with direct
+// handlers. Middleware is applied per method via PrebuildHandler.
 func RegisterServiceWith(s *Server, serviceName string, svr any, methods []struct {
 	Name    string
 	NewReq  func() any
 	Handler UnaryHandler
 }) {
+	ms := make([]ServiceMethod, 0, len(methods))
+	for _, m := range methods {
+		ms = append(ms, ServiceMethod{Name: m.Name, NewReq: m.NewReq, Handler: m.Handler})
+	}
+	registerService(s, serviceName, svr, ms)
+}
+
+// RegisterServiceWithStreams registers a service whose methods may be unary or
+// streaming, all in one ServiceDesc so a mixed service registers exactly once
+// (grpc-go rejects a duplicate service name). Streaming is additive: pure-unary
+// services keep using RegisterServiceWith unchanged, and only services that
+// contain a stream method switch to this entry point.
+func RegisterServiceWithStreams(s *Server, serviceName string, svr any, methods []ServiceMethod) {
+	registerService(s, serviceName, svr, methods)
+}
+
+func registerService(s *Server, serviceName string, svr any, methods []ServiceMethod) {
 	desc := &grpc.ServiceDesc{
 		ServiceName: serviceName,
 		HandlerType: (*any)(nil),
@@ -201,7 +269,19 @@ func RegisterServiceWith(s *Server, serviceName string, svr any, methods []struc
 	for _, m := range methods {
 		md := m
 		fullMethod := "/" + serviceName + "/" + md.Name
-		wrapped := s.PrebuildHandler(fullMethod, transport.Handler(md.Handler))
+
+		if md.Stream {
+			desc.Streams = append(desc.Streams, grpc.StreamDesc{
+				StreamName:    md.Name,
+				Handler:       md.StreamHandler,
+				ServerStreams: md.ServerStreams,
+				ClientStreams: md.ClientStreams,
+			})
+			continue
+		}
+
+		op, _ := opFor(fullMethod)
+		wrapped := s.PrebuildHandler(op, middleware.Handler(md.Handler))
 
 		desc.Methods = append(desc.Methods, grpc.MethodDesc{
 			MethodName: md.Name,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,7 +14,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
 )
 
 // ServerOption configures the HTTP server.
@@ -45,6 +48,16 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// WithMiddlewareManager injects an external composite middleware manager,
+// letting business projects supply their own prefix/regex/exact matchers.
+// Globals registered via the Middleware option are carried over, so option
+// order does not matter.
+func WithMiddlewareManager(m *manager.MiddlewareManager) ServerOption {
+	return func(s *Server) {
+		s.mwManager = m.Use(s.mwManager.Global()...)
+	}
+}
+
 func RequestDecoder(dec DecodeRequestFunc) ServerOption {
 	return func(s *Server) { s.decBody = dec }
 }
@@ -68,10 +81,10 @@ func WithListener(lis net.Listener) ServerOption {
 // like "10.0.0.0/8" or single IPs like "127.0.0.1". A request whose direct
 // peer is NOT listed always reports the direct RemoteAddr, so a client
 // cannot spoof its real IP with forged headers. When unset, headers from any
-// peer are trusted (see transport.ClientIP).
+// peer are trusted (see ip.ClientIP).
 func TrustedProxies(cidrs ...string) ServerOption {
 	return func(s *Server) {
-		s.trustedProxies = append(s.trustedProxies, transport.ParseTrustedProxies(cidrs...)...)
+		s.trustedProxies = append(s.trustedProxies, ip.ParseTrustedProxies(cidrs...)...)
 	}
 }
 
@@ -95,7 +108,7 @@ type Server struct {
 	decBody        DecodeRequestFunc
 	enc            EncodeResponseFunc
 	ene            EncodeErrorFunc
-	mwManager      *MiddlewareManager
+	mwManager      *manager.MiddlewareManager
 	trustedProxies []*net.IPNet
 	app            transport.App
 }
@@ -113,7 +126,17 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // Endpoint returns the advertised endpoint for service registration.
 func (s *Server) Endpoint() (*url.URL, error) {
-	return transport.EndpointURL("http", s.address, s.endpointHost)
+	host, port, err := net.SplitHostPort(s.address)
+	if err != nil {
+		return nil, fmt.Errorf("endpoint http: %q: %w", s.address, err)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = s.endpointHost
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = ip.LocalIP()
+	}
+	return &url.URL{Scheme: "http", Host: net.JoinHostPort(host, port)}, nil
 }
 
 // NewServer creates an HTTP server.
@@ -126,7 +149,7 @@ func NewServer(opts ...ServerOption) *Server {
 		decBody:   DefaultRequestDecoder,
 		enc:       DefaultResponseEncoder,
 		ene:       DefaultErrorEncoder,
-		mwManager: newMiddlewareManager(),
+		mwManager: manager.NewMiddlewareManager(),
 	}
 	s.router.PanicHandler = s.DefaultPanicHandler
 	for _, o := range opts {
@@ -138,11 +161,6 @@ func NewServer(opts ...ServerOption) *Server {
 // Use registers global middlewares applied to all routes.
 func (s *Server) Use(m ...middleware.Middleware) {
 	s.mwManager.Use(m...)
-}
-
-// UseWith registers middlewares scoped to a specific operation path.
-func (s *Server) UseWith(operation string, m ...middleware.Middleware) {
-	s.mwManager.UseWith(operation, m...)
 }
 
 // Handle registers a raw handler with method and httprouter path. The handler
@@ -172,7 +190,7 @@ func HandleUnary[Req, Res any](
 	dec func(httprouter.Params, *Req) error,
 ) {
 	wrapped := func(ctx context.Context, req any) (any, error) { return fn(ctx, req.(*Req)) }
-	prebuilt := s.PrebuildHandler(path, transport.Handler(wrapped))
+	prebuilt := s.PrebuildHandler(path, middleware.Handler(wrapped))
 
 	s.Handle(method, path, func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		req := new(Req)
@@ -225,10 +243,12 @@ func (s *Server) PATCH(path string, handler func(http.ResponseWriter, *http.Requ
 	s.Handle("PATCH", path, handler)
 }
 
-// PrebuildHandler pre-computes middleware chain for an operation.
-// Used by generated code for zero-reflection handler registration.
-func (s *Server) PrebuildHandler(operation string, fn transport.Handler) transport.Handler {
-	matched := s.mwManager.Match(operation)
+// PrebuildHandler pre-computes middleware chain for an operation. The route
+// template (httprouter colon form) is wrapped into a transport.Operation so
+// matching is uniform across protocols. Used by generated code for
+// zero-reflection handler registration.
+func (s *Server) PrebuildHandler(operation string, fn middleware.Handler) middleware.Handler {
+	matched := s.mwManager.Match(transport.Operation{Operation: operation})
 	return middleware.Chain(matched...)(fn)
 }
 
@@ -242,7 +262,9 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	close(s.ready)
-	transport.LogListen(ctx, s.app, s.lis, transport.KindHTTP)
+	if s.app != nil {
+		s.app.Logger().Info(ctx, "listening on", transport.KindKey, transport.KindHTTP, "addr", s.lis.Addr().String())
+	}
 
 	// Each request gets a fresh Transport allocated and injected into its request
 	// context via context.WithValue. The context chain is immutable and GC'd with

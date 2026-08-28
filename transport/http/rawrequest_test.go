@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
 
 func TestMiddlewareSeesRawRequest(t *testing.T) {
 	var got string
-	srv := NewServer(Address(":0"), Middleware(func(next transport.Handler) transport.Handler {
+	srv := NewServer(Address(":0"), Middleware(func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			if tr, ok := transport.FromServerContext(ctx); ok {
 				if htr, ok := tr.(*Transport); ok {

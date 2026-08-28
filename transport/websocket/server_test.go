@@ -15,6 +15,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -359,7 +361,7 @@ func TestWebSocketMiddleware(t *testing.T) {
 	logged := false
 
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				mu.Lock()
 				logged = true
@@ -395,15 +397,18 @@ func TestWebSocketUseWith(t *testing.T) {
 	var mu sync.Mutex
 	logged := false
 
-	srv := NewServer(Address(":0"))
-	srv.UseWith("/test", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req any) (any, error) {
-			mu.Lock()
-			logged = true
-			mu.Unlock()
-			return next(ctx, req)
-		}
-	})
+	srv := NewServer(Address(":0"),
+		WithMiddlewareManager(manager.NewMiddlewareManager(
+			manager.NewExactMatcher("/test").Use(func(next middleware.Handler) middleware.Handler {
+				return func(ctx context.Context, req any) (any, error) {
+					mu.Lock()
+					logged = true
+					mu.Unlock()
+					return next(ctx, req)
+				}
+			}),
+		)),
+	)
 	srv.Handle(http.MethodGet, "/test", func(ctx context.Context, conn *websocket.Conn) error {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -429,7 +434,7 @@ func TestWebSocketUseWith(t *testing.T) {
 
 func TestWebSocketMiddlewareRejects(t *testing.T) {
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				return nil, transportError("rejected")
 			}

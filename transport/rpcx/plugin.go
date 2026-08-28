@@ -3,19 +3,20 @@ package rpcx
 import (
 	"context"
 	"net"
+	"strings"
 
 	rpcxServer "github.com/smallnest/rpcx/server"
 	"github.com/smallnest/rpcx/share"
 
-	gofrTrace "github.com/neo532/gofr/middleware/trace"
-
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/route"
 )
 
 // middlewarePlugin adapts MiddlewareManager to rpcx's PreCallPlugin/PostCallPlugin.
 type middlewarePlugin struct {
-	mwManager      *MiddlewareManager
+	mwManager      *manager.MiddlewareManager
 	trustedProxies []*net.IPNet
 	srv            *Server
 }
@@ -23,9 +24,17 @@ type middlewarePlugin struct {
 func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMethod string, args any) (any, error) {
 	fullMethod := "/" + servicePath + "/" + serviceMethod
 
+	op, tmpl := func() (transport.Operation, string) {
+		if op, tmpl, ok := route.RouteOperation(fullMethod); ok {
+			return op, tmpl
+		}
+		return transport.Operation{Operation: fullMethod}, ""
+	}()
+
 	// Inject Transporter into the mutable share.Context so that
 	// transport.FromServerContext(ctx) works in both middleware and handler.
 	var shareCtx *share.Context
+	var tr *Transport
 	if sc, ok := ctx.(*share.Context); ok {
 		shareCtx = sc
 		reqMeta, _ := shareCtx.Value(share.ReqMetaDataKey).(map[string]string)
@@ -40,8 +49,11 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 			share.WithLocalValue(shareCtx, share.ResMetaDataKey, resMeta)
 		}
 
-		tr := &Transport{
-			operation:      fullMethod,
+		tr = &Transport{
+			operation:      op.Operation,
+			method:         op.Method,
+			routeKey:       strings.TrimPrefix(fullMethod, "/"),
+			pathTmpl:       tmpl,
 			reqHeader:      headerCarrier(reqMeta),
 			replyHeader:    headerCarrier(resMeta),
 			trustedProxies: p.trustedProxies,
@@ -49,6 +61,7 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 			// after NewServer, so capturing it at construction would freeze nil.
 			app: p.srv.app,
 		}
+		tr.SetReq(args)
 		if conn, ok := shareCtx.Value(rpcxServer.RemoteConnContextKey).(net.Conn); ok && conn.RemoteAddr() != nil {
 			tr.peer = conn.RemoteAddr().String()
 		}
@@ -57,8 +70,12 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 		share.WithLocalValue(shareCtx, transport.ServerTransportKey{}, tr)
 	}
 
-	// Existing middleware chain — ctx now carries the Transporter.
-	matched := p.mwManager.Match(fullMethod)
+	// Existing middleware chain — ctx now carries the Transporter. rpcx always
+	// passes a *share.Context, so tr is set; the nil check is purely defensive.
+	if tr == nil {
+		return args, nil
+	}
+	matched := p.mwManager.Match(tr.Operation())
 	if len(matched) == 0 {
 		return args, nil
 	}
@@ -69,14 +86,25 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 		chainCtx = ctx
 		return req, nil
 	})
-	out, err := h(ctx, args)
+
+	// rpcx calls the service with the same share.Context, so values installed by
+	// middleware (e.g. PackageContextArguments' request args) must be published
+	// onto it to reach the handler. Run the chain on a base detached from
+	// shareCtx: chainCtx would otherwise derive from shareCtx, and assigning that
+	// as shareCtx.Context would recurse through shareCtx.Value. The Transporter
+	// (normally carried in the tags) is put on the base explicitly, then the
+	// final chain context replaces shareCtx's base so the handler resolves every
+	// middleware value, including the trace span.
+	base := ctx
+	if shareCtx != nil {
+		base = context.WithValue(shareCtx.Context, transport.ServerTransportKey{}, tr)
+	}
+	out, err := h(base, args)
 	if err != nil {
 		return out, err
 	}
-	// rpcx calls the service with the same share.Context, so values installed by
-	// middleware (e.g. the trace span) must be carried into it explicitly.
 	if shareCtx != nil && chainCtx != nil {
-		shareCtx.Context = gofrTrace.CarrySpan(shareCtx.Context, chainCtx)
+		shareCtx.Context = chainCtx
 	}
 	return out, nil
 }

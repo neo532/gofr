@@ -267,13 +267,14 @@ func (a *App) buildInstance() (*registry.ServiceInstance, error) {
 		group = registry.DefaultGroup
 	}
 	inst := &registry.ServiceInstance{
-		Name:      a.opts.name,
-		Version:   a.opts.version,
-		Group:     group,
-		Protocol:  a.opts.protocol,
-		Weight:    a.opts.weight,
-		Metadata:  a.opts.metadata,
-		Endpoints: []string{},
+		Name:          a.opts.name,
+		VersionGit:    a.opts.versionGit,
+		VersionSchema: a.opts.schemaVersion,
+		Group:         group,
+		Protocol:      a.opts.protocol,
+		Weight:        a.opts.weight,
+		Metadata:      a.opts.metadata,
+		Endpoints:     []string{},
 	}
 	if a.opts.id != "" {
 		inst.ID = a.opts.id

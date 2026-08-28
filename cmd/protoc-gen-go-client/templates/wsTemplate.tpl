@@ -1,5 +1,5 @@
 {{range $svc := .Services}}
-func New{{$svc.ServiceType}}WSClient(baseURL string, dialer *websocket.Dialer) *{{$svc.ServiceType}}Client {
+func New{{$svc.ServiceType}}WSClient(baseURL string, dialer WSDialer) *{{$svc.ServiceType}}Client {
 	if dialer == nil {
 		dialer = websocket.DefaultDialer
 	}

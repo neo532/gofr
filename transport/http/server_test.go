@@ -13,6 +13,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -114,7 +115,7 @@ func TestServerMiddleware(t *testing.T) {
 	var logged bool
 
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				logged = true
 				return next(ctx, req)

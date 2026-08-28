@@ -9,6 +9,8 @@ import (
 	rpcxClient "github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/share"
 
+	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -26,6 +28,21 @@ type HelloService struct{}
 
 func (s *HelloService) SayHello(ctx context.Context, args *HelloArgs, reply *HelloReply) error {
 	reply.Message = "Hello " + args.Name
+	return nil
+}
+
+// contextKey is a unique per-test context key type (comparable, like the ones
+// middleware use, e.g. gitee.com/neo532/kit/middleware's ContextArgs).
+type contextKey string
+
+// CtxService echoes a middleware-installed context value back through the reply,
+// proving values set by middleware in PreCall reach the rpcx handler.
+type CtxService struct{ key contextKey }
+
+func (s *CtxService) Get(ctx context.Context, args *HelloArgs, reply *HelloReply) error {
+	if v, ok := ctx.Value(s.key).(string); ok {
+		reply.Message = v
+	}
 	return nil
 }
 
@@ -137,7 +154,7 @@ func TestRPCXMiddleware(t *testing.T) {
 	var logged bool
 
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				logged = true
 				return next(ctx, req)
@@ -162,16 +179,43 @@ func TestRPCXMiddleware(t *testing.T) {
 	}
 }
 
+func TestRPCXMiddlewarePropagatesContextValue(t *testing.T) {
+	key := contextKey("reqArg")
+	srv := NewServer(Address(":0"),
+		Middleware(func(next middleware.Handler) middleware.Handler {
+			return func(ctx context.Context, req any) (any, error) {
+				return next(context.WithValue(ctx, key, "from-middleware"), req)
+			}
+		}),
+	)
+	RegisterServiceWith(srv, "CtxService", &CtxService{key: key})
+
+	addr, stop := newTestServer(t, srv)
+	defer stop()
+
+	c := newRPCXClient(t, addr)
+	reply := &HelloReply{}
+	if err := c.Call(context.Background(), "CtxService", "Get", &HelloArgs{}, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message != "from-middleware" {
+		t.Fatalf("got %q, want %q (middleware context value must reach the handler)", reply.Message, "from-middleware")
+	}
+}
+
 func TestRPCXUseWith(t *testing.T) {
 	var logged bool
 
-	srv := NewServer(Address(":0"))
-	srv.UseWith("/HelloService/SayHello", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req any) (any, error) {
-			logged = true
-			return next(ctx, req)
-		}
-	})
+	srv := NewServer(Address(":0"),
+		WithMiddlewareManager(manager.NewMiddlewareManager(
+			manager.NewExactMatcher("/HelloService/SayHello").Use(func(next middleware.Handler) middleware.Handler {
+				return func(ctx context.Context, req any) (any, error) {
+					logged = true
+					return next(ctx, req)
+				}
+			}),
+		)),
+	)
 	RegisterServiceWith(srv, "HelloService", &HelloService{})
 
 	addr, stop := newTestServer(t, srv)

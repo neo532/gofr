@@ -28,6 +28,10 @@ type serviceDesc struct {
 type fileDesc struct {
 	PackageName string
 	Services    []*serviceDesc
+	HasHTTP     bool
+	HasGRPC     bool
+	HasRPCX     bool
+	HasWS       bool
 }
 
 // fieldName converts a method name to an unexported function field name.

@@ -34,7 +34,7 @@ type fakeTransport struct {
 
 func (t *fakeTransport) Kind() transport.Kind           { return transport.KindHTTP }
 func (t *fakeTransport) Endpoint() string                { return "test" }
-func (t *fakeTransport) Operation() string               { return "/test" }
+func (t *fakeTransport) Operation() transport.Operation  { return transport.Operation{Operation: "/test"} }
 func (t *fakeTransport) RequestHeader() transport.Header  { return t.reqHeader }
 func (t *fakeTransport) ReplyHeader() transport.Header    { return t.replyHeader }
 func (t *fakeTransport) App() transport.App              { return nil }

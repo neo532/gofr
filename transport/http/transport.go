@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
 )
 
 var _ transport.Transporter = (*Transport)(nil)
@@ -23,17 +24,28 @@ type Transport struct {
 
 func (t *Transport) Kind() transport.Kind            { return transport.KindHTTP }
 func (t *Transport) Endpoint() string                 { return t.endpoint }
-func (t *Transport) Operation() string                { return t.operation }
+func (t *Transport) Operation() transport.Operation   { return t.op() }
 func (t *Transport) RequestHeader() transport.Header  { return t.reqHeader }
 func (t *Transport) ReplyHeader() transport.Header    { return t.replyHeader }
 func (t *Transport) App() transport.App               { return t.app }
+
+// op builds the request identity: the route template, the real URL path and the
+// HTTP verb. RawRequest must be set (the top-level handler always does).
+func (t *Transport) op() (o transport.Operation) {
+	o.Operation = t.operation
+	if t.req != nil {
+		o.Path = t.req.URL.Path
+		o.Method = t.req.Method
+	}
+	return
+}
 
 // RawRequest returns the underlying *http.Request. Middleware that needs the
 // method, real URL or query string (not available from Operation(), which holds
 // the route template) can reach it here.
 func (t *Transport) RawRequest() *http.Request { return t.req }
 func (t *Transport) ClientIP() string {
-	return transport.ClientIP(t.peer, t.reqHeader.Get, t.trustedProxies)
+	return ip.ClientIP(t.peer, t.reqHeader.Get, t.trustedProxies)
 }
 
 type headerCarrier http.Header

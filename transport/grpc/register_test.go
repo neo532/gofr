@@ -14,6 +14,8 @@ import (
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -152,7 +154,7 @@ func TestGRPCMiddleware(t *testing.T) {
 	logged := false
 
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				mu.Lock()
 				logged = true
@@ -194,15 +196,18 @@ func TestGRPCUseWith(t *testing.T) {
 	var mu sync.Mutex
 	logged := false
 
-	srv := NewServer(Address(":0"))
-	srv.UseWith("/test.Greeter/SayHello", func(next transport.Handler) transport.Handler {
-		return func(ctx context.Context, req any) (any, error) {
-			mu.Lock()
-			logged = true
-			mu.Unlock()
-			return next(ctx, req)
-		}
-	})
+	srv := NewServer(Address(":0"),
+		WithMiddlewareManager(manager.NewMiddlewareManager(
+			manager.NewExactMatcher("/test.Greeter/SayHello").Use(func(next middleware.Handler) middleware.Handler {
+				return func(ctx context.Context, req any) (any, error) {
+					mu.Lock()
+					logged = true
+					mu.Unlock()
+					return next(ctx, req)
+				}
+			}),
+		)),
+	)
 	RegisterServiceWith(srv, "test.Greeter", &testSvc{}, []struct {
 		Name    string
 		NewReq  func() any
@@ -274,5 +279,42 @@ func TestGRPCLifecycle(t *testing.T) {
 	invoke(t, conn, "/test.Greeter/SayHello", &helloReq{Name: "Lifecycle"}, reply)
 	if reply.Message != "Hello Lifecycle" {
 		t.Fatalf("got %q, want %q", reply.Message, "Hello Lifecycle")
+	}
+}
+
+func TestRegisterServiceWithStreams(t *testing.T) {
+	srv := NewServer(Address(":0"))
+	RegisterServiceWithStreams(srv, "test.Mixed", &testSvc{}, []ServiceMethod{
+		{
+			Name:   "SayHello",
+			NewReq: func() any { return &helloReq{} },
+			Handler: func(ctx context.Context, req any) (any, error) {
+				return &helloReply{Message: "unary"}, nil
+			},
+		},
+		{
+			Name:          "Watch",
+			Stream:        true,
+			StreamHandler: func(srv any, stream grpc.ServerStream) error { return nil },
+			ServerStreams: true,
+		},
+	})
+
+	svc, ok := srv.GetServiceInfo()["test.Mixed"]
+	if !ok {
+		t.Fatal("service test.Mixed not registered")
+	}
+	if len(svc.Methods) != 2 {
+		t.Fatalf("got %d methods, want 2 (SayHello unary + Watch stream)", len(svc.Methods))
+	}
+	seen := make(map[string]grpc.MethodInfo, len(svc.Methods))
+	for _, m := range svc.Methods {
+		seen[m.Name] = m
+	}
+	if u, ok := seen["SayHello"]; !ok || u.IsClientStream || u.IsServerStream {
+		t.Fatalf("SayHello should be unary, got %+v", u)
+	}
+	if s, ok := seen["Watch"]; !ok || !s.IsServerStream || s.IsClientStream {
+		t.Fatalf("Watch should be server-streaming, got %+v", s)
 	}
 }

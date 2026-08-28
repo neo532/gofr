@@ -25,14 +25,15 @@ const DefaultGroup = "default"
 
 // ServiceInstance is a single running instance of a service.
 type ServiceInstance struct {
-	ID        string            // unique instance ID, e.g. "ip:pid"
-	Name      string            // service name, e.g. "user"
-	Version   string
-	Group     string            // registration group; "" registers under DefaultGroup
-	Protocol  string            // caller protocol this instance advertises, e.g. "rpcx"
-	Weight    int               // load-balancing weight; 0 means default
-	Metadata  map[string]string
-	Endpoints []string          // "grpc://10.0.0.1:8502", "rpcx://10.0.0.1:8503"
+	ID            string            // unique instance ID, e.g. "ip:pid"
+	Name          string            // service name, e.g. "user"
+	VersionGit    string            // git/build version, injected at build time (-ldflags)
+	VersionSchema string            // proto schema hash, from generated registry.pb.go
+	Group         string            // registration group; "" registers under DefaultGroup
+	Protocol      string            // caller protocol this instance advertises, e.g. "rpcx"
+	Weight        int               // load-balancing weight; 0 means default
+	Metadata      map[string]string
+	Endpoints     []string          // "grpc://10.0.0.1:8502", "rpcx://10.0.0.1:8503"
 }
 
 // Registrar registers a service instance and keeps its lease alive until

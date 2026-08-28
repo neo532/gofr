@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gokit/logger"
 )
@@ -18,7 +19,7 @@ func (fakeApp) Logger() logger.ILogger { return nil }
 func TestRPCXAppInjection(t *testing.T) {
 	var gotApp transport.App
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				if tr, ok := transport.FromServerContext(ctx); ok {
 					gotApp = tr.App()

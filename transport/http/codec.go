@@ -16,7 +16,6 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Codec represents a pair of request decoder and response encoder for a content type.
@@ -31,7 +30,14 @@ var (
 	codecs   = map[string]*Codec{
 		"json": {
 			ContentType: "application/json",
-			Decode:      json.Unmarshal,
+			// Decode 对 proto 消息用 protojson（int64 按字符串、enum 按名字/数字），
+			// 与 Encode、query 解码保持一致；非 proto 值回退 encoding/json。
+			Decode: func(data []byte, v any) error {
+				if pm, ok := v.(proto.Message); ok {
+					return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(data, pm)
+				}
+				return json.Unmarshal(data, v)
+			},
 			Encode: func(v any) ([]byte, error) {
 				if pm, ok := v.(proto.Message); ok {
 					return protojson.MarshalOptions{UseEnumNumbers: true}.Marshal(pm)
@@ -82,48 +88,32 @@ type EncodeResponseFunc func(http.ResponseWriter, *http.Request, any) error
 // EncodeErrorFunc encodes an error into an HTTP response.
 type EncodeErrorFunc func(http.ResponseWriter, *http.Request, error)
 
-// decodeQuery converts URL query params into JSON and decodes them into v.
-// Repeated fields must be emitted as JSON arrays (encoding/json does not
-// coerce a single scalar into a slice), so list fields are detected via the
-// proto descriptor; scalar fields get the single value.
+// decodeQuery binds URL query params onto v. protojson matches the proto field
+// names directly (lowerCamelCase) and coerces numeric strings to int64 etc
+// natively. A key ending in "[]" becomes a JSON array (key[]=a&key[]=b ->
+// {"key":["a","b"]}), so a single value can fill a repeated field
+// (key[]=a -> {"key":["a"]}); any other key is a scalar. Non-proto values
+// fall back to a JSON round-trip.
 func decodeQuery(q url.Values, v any) error {
 	if len(q) == 0 {
 		return nil
 	}
 	m := make(map[string]any, len(q))
 	for k, vs := range q {
-		if isRepeatedField(v, k) {
-			m[k] = vs
-		} else if len(vs) == 1 {
-			m[k] = vs[0]
+		if strings.HasSuffix(k, "[]") {
+			m[strings.TrimSuffix(k, "[]")] = vs
 		} else {
-			m[k] = vs
+			m[k] = vs[0]
 		}
 	}
 	bt, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
+	if pm, ok := v.(proto.Message); ok {
+		return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(bt, pm)
+	}
 	return json.Unmarshal(bt, v)
-}
-
-// isRepeatedField reports whether v is a proto message whose field matching
-// name (proto snake_case or JSON camelCase) is a list field. Non-proto values
-// have no field schema, so decodeQuery falls back to its array-vs-scalar
-// heuristic for them.
-func isRepeatedField(v any, name string) bool {
-	pm, ok := v.(proto.Message)
-	if !ok {
-		return false
-	}
-	fields := pm.ProtoReflect().Descriptor().Fields()
-	if fd := fields.ByName(protoreflect.Name(name)); fd != nil {
-		return fd.IsList()
-	}
-	if fd := fields.ByJSONName(name); fd != nil {
-		return fd.IsList()
-	}
-	return false
 }
 
 // DefaultRequestDecoder decodes request body based on Content-Type. When the

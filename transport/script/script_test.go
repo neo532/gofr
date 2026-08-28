@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -40,7 +41,7 @@ func TestScriptRunsMiddlewareWithCommand(t *testing.T) {
 			command = tr.(*scriptTransport).Command()
 			return nil
 		},
-	}, Middleware(func(next transport.Handler) transport.Handler {
+	}, Middleware(func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			called = true
 			return next(ctx, req)
@@ -63,7 +64,7 @@ func TestScriptMiddlewareError(t *testing.T) {
 		"boom": func(ctx context.Context, args ...string) error {
 			return errors.New("boom")
 		},
-	}, Middleware(func(next transport.Handler) transport.Handler {
+	}, Middleware(func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			return next(ctx, req)
 		}

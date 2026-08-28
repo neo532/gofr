@@ -11,6 +11,7 @@ func main() {
 			}
 			generateFile(gen, f, protos)
 		}
+		generateAggregates(gen)
 		return nil
 	})
 }

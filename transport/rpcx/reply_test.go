@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport"
 )
 
@@ -22,7 +23,7 @@ func TestRPCXReplyDeliveredToMiddleware(t *testing.T) {
 	var gotErr error
 
 	srv := NewServer(Address(":0"),
-		Middleware(func(next transport.Handler) transport.Handler {
+		Middleware(func(next middleware.Handler) middleware.Handler {
 			return func(ctx context.Context, req any) (any, error) {
 				if tr, ok := transport.FromServerContext(ctx); ok {
 					if sub, ok := tr.(replySubscriber); ok {

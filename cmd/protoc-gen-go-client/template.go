@@ -22,31 +22,34 @@ var rpcxTmplContent string
 //go:embed templates/wsTemplate.tpl
 var wsTmplContent string
 
+//go:embed templates/clientSetTemplate.tpl
+var clientSetTmplContent string
+
 func generateClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("client", clientTmplContent, pkg, services)
+	return renderTemplate("client", clientTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
 func generateHTTPClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("http-client", httpTmplContent, pkg, services)
+	return renderTemplate("http-client", httpTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
 func generateGRPCClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("grpc-client", grpcTmplContent, pkg, services)
+	return renderTemplate("grpc-client", grpcTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
 func generateRPCXClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("rpcx-client", rpcxTmplContent, pkg, services)
+	return renderTemplate("rpcx-client", rpcxTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
 func generateWSClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("ws-client", wsTmplContent, pkg, services)
+	return renderTemplate("ws-client", wsTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
-func renderTemplate(name, tmpl string, pkg string, services []*serviceDesc) string {
-	data := &fileDesc{
-		PackageName: pkg,
-		Services:    services,
-	}
+func generateClientSet(data *fileDesc) string {
+	return renderTemplate("client-set", clientSetTmplContent, data)
+}
+
+func renderTemplate(name, tmpl string, data *fileDesc) string {
 	t, err := template.New(name).Parse(strings.TrimSpace(tmpl))
 	if err != nil {
 		panic(err)

@@ -14,13 +14,14 @@ import (
 type Option func(o *options)
 
 type options struct {
-	id       string
-	name     string
-	version  string
-	metadata map[string]string
-	group    string
-	protocol string
-	weight   int
+	id            string
+	name          string
+	versionGit    string // git/build version
+	schemaVersion string // proto schema hash, from generated registry.pb.go
+	metadata      map[string]string
+	group         string
+	protocol      string
+	weight        int
 
 	ctx  context.Context
 	sigs []os.Signal
@@ -51,8 +52,17 @@ func Name(name string) Option {
 	return func(o *options) { o.name = name }
 }
 
-func Version(v string) Option {
-	return func(o *options) { o.version = v }
+// VersionGit 设置注册实例的 git/build 版本（-ldflags 注入），供部署身份与
+// 观测使用。它不驱动网关的反射缓存失效——那由 SchemaVersion 承担，
+// 因为 git 版本在无 schema 变更的重启时也会变化。
+func VersionGit(v string) Option {
+	return func(o *options) { o.versionGit = v }
+}
+
+// SchemaVersion 设置注册实例的 proto schema 哈希（来自生成的 registry.pb.go）。
+// 网关据此判断后端 schema 是否变更，决定是否重新 dump 反射面。
+func SchemaVersion(v string) Option {
+	return func(o *options) { o.schemaVersion = v }
 }
 
 func Metadata(md map[string]string) Option {

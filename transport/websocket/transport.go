@@ -5,12 +5,15 @@ import (
 	"net/http"
 
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
 )
 
 // wsTransport implements transport.Transporter for WebSocket connections.
 type wsTransport struct {
 	endpoint       string
-	operation      string
+	operation      string // proto route template (httprouter colon form)
+	path           string // real request path with actual parameter values
+	method         string // proto HTTP verb
 	reqHeader      headerCarrier
 	peer           string
 	trustedProxies []*net.IPNet
@@ -19,12 +22,14 @@ type wsTransport struct {
 
 func (t *wsTransport) Kind() transport.Kind          { return transport.KindWebSocket }
 func (t *wsTransport) Endpoint() string               { return t.endpoint }
-func (t *wsTransport) Operation() string               { return t.operation }
+func (t *wsTransport) Operation() transport.Operation {
+	return transport.Operation{Operation: t.operation, Path: t.path, Method: t.method}
+}
 func (t *wsTransport) RequestHeader() transport.Header  { return t.reqHeader }
 func (t *wsTransport) ReplyHeader() transport.Header    { return nil }
 func (t *wsTransport) App() transport.App              { return t.app }
 func (t *wsTransport) ClientIP() string {
-	return transport.ClientIP(t.peer, t.reqHeader.Get, t.trustedProxies)
+	return ip.ClientIP(t.peer, t.reqHeader.Get, t.trustedProxies)
 }
 
 // headerCarrier adapts http.Header to transport.Header.

@@ -20,6 +20,7 @@ package websocket
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -30,7 +31,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
 )
 
 // BinaryMessage is a sent for WebSocket binary frames (matches gorilla/websocket.BinaryMessage).
@@ -61,12 +64,22 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// WithMiddlewareManager injects an external composite middleware manager,
+// letting business projects supply their own prefix/regex/exact matchers.
+// Globals registered via the Middleware option are carried over, so option
+// order does not matter.
+func WithMiddlewareManager(m *manager.MiddlewareManager) ServerOption {
+	return func(s *Server) {
+		s.mwManager = m.Use(s.mwManager.Global()...)
+	}
+}
+
 // TrustedProxies configures the reverse-proxy address ranges whose
 // X-Forwarded-For / X-Real-IP headers ClientIP will trust (see
-// transport.ClientIP). When unset, headers from any peer are trusted.
+// transport/ip.ClientIP). When unset, headers from any peer are trusted.
 func TrustedProxies(cidrs ...string) ServerOption {
 	return func(s *Server) {
-		s.trustedProxies = append(s.trustedProxies, transport.ParseTrustedProxies(cidrs...)...)
+		s.trustedProxies = append(s.trustedProxies, ip.ParseTrustedProxies(cidrs...)...)
 	}
 }
 
@@ -106,7 +119,7 @@ type Server struct {
 	routes         []wsRoute
 	router         *httprouter.Router
 	upgrader       websocket.Upgrader
-	mwManager      *MiddlewareManager
+	mwManager      *manager.MiddlewareManager
 	httpSrv        *http.Server
 	timeout        time.Duration
 	trustedProxies []*net.IPNet
@@ -117,7 +130,7 @@ type Server struct {
 func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
 		upgrader:  websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
-		mwManager: newMiddlewareManager(),
+		mwManager: manager.NewMiddlewareManager(),
 		httpSrv:   &http.Server{},
 		ready:     make(chan struct{}),
 	}
@@ -140,7 +153,17 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // Endpoint returns the advertised endpoint for service registration.
 func (s *Server) Endpoint() (*url.URL, error) {
-	return transport.EndpointURL("ws", s.address, s.endpointHost)
+	host, port, err := net.SplitHostPort(s.address)
+	if err != nil {
+		return nil, fmt.Errorf("endpoint ws: %q: %w", s.address, err)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = s.endpointHost
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = ip.LocalIP()
+	}
+	return &url.URL{Scheme: "ws", Host: net.JoinHostPort(host, port)}, nil
 }
 
 // Handle registers a WebSocket handler for a proto method. method is the
@@ -168,7 +191,7 @@ func (s *Server) buildRouter() {
 	for _, rt := range s.routes {
 		method, path, handler := rt.method, rt.path, rt.handler
 		r.Handle(method, path, func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-			s.serveWS(w, r, handler)
+			s.serveWS(w, r, path, method, handler)
 		})
 	}
 	s.router = r
@@ -177,11 +200,6 @@ func (s *Server) buildRouter() {
 // Use registers global middlewares.
 func (s *Server) Use(m ...middleware.Middleware) {
 	s.mwManager.Use(m...)
-}
-
-// UseWith registers middlewares scoped to a specific path.
-func (s *Server) UseWith(path string, m ...middleware.Middleware) {
-	s.mwManager.UseWith(path, m...)
 }
 
 // Start implements transport.Server.
@@ -197,7 +215,9 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	close(s.ready)
-	transport.LogListen(ctx, s.app, s.lis, transport.KindWebSocket)
+	if s.app != nil {
+		s.app.Logger().Info(ctx, "listening on", transport.KindKey, transport.KindWebSocket, "addr", s.lis.Addr().String())
+	}
 
 	s.httpSrv.Handler = http.HandlerFunc(s.serveHTTP)
 	s.httpSrv.ReadTimeout = s.timeout
@@ -256,12 +276,16 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveWS runs the middleware chain, upgrades the connection and hands it to
-// the handler. It is invoked from the httprouter route closure.
-func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, handler WsHandler) {
+// the handler. operation is the proto route template (httprouter colon form)
+// and method the proto HTTP verb, both stamped from the registered route; the
+// real request path is read from r.URL.Path.
+func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, operation, method string, handler WsHandler) {
 	// Set up transport context
 	tr := &wsTransport{
 		endpoint:       r.Host,
-		operation:      r.URL.Path,
+		operation:      operation,
+		path:           r.URL.Path,
+		method:         method,
 		reqHeader:      headerCarrier(r.Header),
 		peer:           r.RemoteAddr,
 		trustedProxies: s.trustedProxies,
@@ -272,7 +296,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, handler WsHandl
 	// Run middleware chain before upgrade. The post-middleware context is
 	// captured so middleware-installed values (e.g. a trace span) reach the
 	// handler.
-	matched := s.mwManager.Match(r.URL.Path)
+	matched := s.mwManager.Match(tr.Operation())
 	if len(matched) > 0 {
 		chain := middleware.Chain(matched...)
 		var ctxIn context.Context

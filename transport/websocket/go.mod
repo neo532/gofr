@@ -8,6 +8,6 @@ require (
 	github.com/neo532/gofr v0.0.0
 )
 
-require github.com/neo532/gokit v1.0.40 // indirect
+require github.com/neo532/gokit v1.0.48 // indirect
 
 replace github.com/neo532/gofr => ../../

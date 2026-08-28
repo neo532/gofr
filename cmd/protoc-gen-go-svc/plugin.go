@@ -1,12 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // protocols controls which protocol registration files are generated.
@@ -527,6 +532,31 @@ func serviceDir(protoPath string) string {
 	return parts[0] + "/" + parts[1]
 }
 
+// schemaHash 计算服务目录下全部 proto 文件的确定性哈希，作为该服务的
+// schema 版本（写入 registry.pb.go 的 SchemaHash）。只反映协议内容：
+// 剥离 SourceCodeInfo 使注释变化不 bump 版本；文件按路径排序保证跨生成
+// 一致。目录前缀匹配任意深度，后续在服务目录下新增子文件夹自动纳入。
+func schemaHash(gen *protogen.Plugin, dir string) string {
+	var files []*descriptorpb.FileDescriptorProto
+	for _, fdp := range gen.Request.GetProtoFile() {
+		if !strings.HasPrefix(fdp.GetName(), dir+"/") {
+			continue
+		}
+		fdp.SourceCodeInfo = nil
+		files = append(files, fdp)
+	}
+	if len(files) == 0 {
+		return ""
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].GetName() < files[j].GetName() })
+	b, err := proto.Marshal(&descriptorpb.FileDescriptorSet{File: files})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
 // emitRegistryServiceNames writes one file per service into the service's
 // top-level directory holding the name it registers under in the registry, so
 // consumers reference it instead of hardcoding it. Only the biz/{svc}/api
@@ -569,6 +599,10 @@ func emitRegistryServiceNames(gen *protogen.Plugin) {
 		g.P("// ServiceName is the name this service registers under in the registry,")
 		g.P("// derived from the first segment of its proto package (user.api.* -> user).")
 		g.P("const ServiceName = ", strconv.Quote(name))
+		g.P("// SchemaHash is a hash of this service's proto schema (all files under ", dir, "),")
+		g.P("// used as the registry version so consumers can detect a schema change")
+		g.P("// without re-dumping the reflection surface.")
+		g.P("const SchemaHash = ", strconv.Quote(schemaHash(gen, dir)))
 		g.P()
 	}
 }

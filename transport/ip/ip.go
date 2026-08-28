@@ -1,9 +1,28 @@
-package transport
+// Package ip resolves real client IPs from proxy headers, subject to a
+// trusted-proxy allowlist.
+package ip
 
 import (
 	"net"
 	"strings"
 )
+
+// LocalIP returns the first non-loopback IPv4 address, the default advertised
+// host for registration when no explicit host is configured.
+func LocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() || ipnet.IP.To4() == nil {
+			continue
+		}
+		return ipnet.IP.String()
+	}
+	return ""
+}
 
 // ClientIP resolves the real client IP from the direct peer address and a
 // header lookup. It reads X-Forwarded-For (leftmost entry) then X-Real-IP,

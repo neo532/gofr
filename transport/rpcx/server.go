@@ -2,6 +2,7 @@ package rpcx
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"sync"
@@ -9,7 +10,9 @@ import (
 	rpcxServer "github.com/smallnest/rpcx/server"
 
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gofr/transport/ip"
 )
 
 // ServerOption configures the rpcx server.
@@ -36,12 +39,22 @@ func Middleware(m ...middleware.Middleware) ServerOption {
 	return func(s *Server) { s.mwManager.Use(m...) }
 }
 
+// WithMiddlewareManager injects an external composite middleware manager,
+// letting business projects supply their own prefix/regex/exact matchers.
+// Globals registered via the Middleware option are carried over, so option
+// order does not matter.
+func WithMiddlewareManager(m *manager.MiddlewareManager) ServerOption {
+	return func(s *Server) {
+		s.mwManager = m.Use(s.mwManager.Global()...)
+	}
+}
+
 // TrustedProxies configures the reverse-proxy address ranges whose
 // X-Forwarded-For / X-Real-IP metadata ClientIP will trust (see
-// transport.ClientIP). When unset, metadata from any peer is trusted.
+// transport/ip.ClientIP). When unset, metadata from any peer is trusted.
 func TrustedProxies(cidrs ...string) ServerOption {
 	return func(s *Server) {
-		s.trustedProxies = append(s.trustedProxies, transport.ParseTrustedProxies(cidrs...)...)
+		s.trustedProxies = append(s.trustedProxies, ip.ParseTrustedProxies(cidrs...)...)
 	}
 }
 
@@ -71,7 +84,7 @@ type Server struct {
 	endpointHost   string
 	lis            net.Listener
 	ready          chan struct{}
-	mwManager      *MiddlewareManager
+	mwManager      *manager.MiddlewareManager
 	trustedProxies []*net.IPNet
 	rpcxOpts       []rpcxServer.OptionFn
 	app            transport.App
@@ -107,7 +120,17 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 
 // Endpoint returns the advertised endpoint for service registration.
 func (s *Server) Endpoint() (*url.URL, error) {
-	return transport.EndpointURL("rpcx", s.address, s.endpointHost)
+	host, port, err := net.SplitHostPort(s.address)
+	if err != nil {
+		return nil, fmt.Errorf("endpoint rpcx: %q: %w", s.address, err)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = s.endpointHost
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = ip.LocalIP()
+	}
+	return &url.URL{Scheme: "rpcx", Host: net.JoinHostPort(host, port)}, nil
 }
 
 // NewServer creates an rpcx server with middleware support.
@@ -115,7 +138,7 @@ func (s *Server) Endpoint() (*url.URL, error) {
 func NewServer(opts ...ServerOption) *Server {
 	s := &Server{
 		network:   "tcp",
-		mwManager: newMiddlewareManager(),
+		mwManager: manager.NewMiddlewareManager(),
 		ready:     make(chan struct{}),
 	}
 	for _, o := range opts {
@@ -136,11 +159,6 @@ func (s *Server) Use(m ...middleware.Middleware) {
 	s.mwManager.Use(m...)
 }
 
-// UseWith registers middlewares scoped to a specific method path.
-func (s *Server) UseWith(method string, m ...middleware.Middleware) {
-	s.mwManager.UseWith(method, m...)
-}
-
 // Start implements transport.Server.
 func (s *Server) Start(ctx context.Context) error {
 	if s.lis == nil {
@@ -151,7 +169,9 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	close(s.ready)
-	transport.LogListen(ctx, s.app, s.lis, transport.KindRPCX)
+	if s.app != nil {
+		s.app.Logger().Info(ctx, "listening on", transport.KindKey, transport.KindRPCX, "addr", s.lis.Addr().String())
+	}
 
 	go func() {
 		<-ctx.Done()

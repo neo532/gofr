@@ -5,14 +5,13 @@ import (
 	"encoding/binary"
 	"math/rand/v2"
 
+	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gofr/transport"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/neo532/gofr/middleware"
-	"github.com/neo532/gofr/transport"
 )
 
 // propagator is gofr's default text map propagator: W3C Trace Context plus
@@ -66,7 +65,7 @@ func Server(opts ...Option) middleware.Middleware {
 		o.propagator = propagator
 	}
 
-	return func(next transport.Handler) transport.Handler {
+	return func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
 			tr, ok := transport.FromServerContext(ctx)
 			if !ok {
@@ -83,7 +82,7 @@ func Server(opts ...Option) middleware.Middleware {
 			if tp == nil {
 				tp = otel.GetTracerProvider()
 			}
-			ctx, span := tp.Tracer(o.tracerName).Start(ctx, tr.Operation(),
+			ctx, span := tp.Tracer(o.tracerName).Start(ctx, tr.Operation().Operation,
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(attribute.String("client.ip", tr.ClientIP())),
 			)

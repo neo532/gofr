@@ -100,7 +100,7 @@ type scriptTransport struct {
 
 func (t *scriptTransport) Kind() transport.Kind           { return transport.KindScript }
 func (t *scriptTransport) Endpoint() string                { return "" }
-func (t *scriptTransport) Operation() string               { return "" }
+func (t *scriptTransport) Operation() transport.Operation { return transport.Operation{} }
 func (t *scriptTransport) RequestHeader() transport.Header { return nil }
 func (t *scriptTransport) ReplyHeader() transport.Header   { return nil }
 func (t *scriptTransport) App() transport.App              { return t.app }
