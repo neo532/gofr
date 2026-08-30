@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -108,7 +107,7 @@ func decodeQuery(q url.Values, v any) error {
 	}
 	bt, err := json.Marshal(m)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	if pm, ok := v.(proto.Message); ok {
 		return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(bt, pm)
@@ -122,7 +121,7 @@ func decodeQuery(q url.Values, v any) error {
 func DefaultRequestDecoder(r *http.Request, v any) error {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	if len(data) == 0 {
 		return decodeQuery(r.URL.Query(), v)
@@ -143,10 +142,10 @@ func DefaultResponseEncoder(w http.ResponseWriter, r *http.Request, v any) error
 	}
 	data, err := c.Encode(v)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	_, err = w.Write(data)
-	return err
+	return errorx.Wrap(err)
 }
 
 // DefaultErrorEncoder encodes error as JSON with status code.
@@ -189,47 +188,47 @@ func Parse[T any](s string) (T, error) {
 	case *int64:
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = n
 	case *int32:
 		n, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = int32(n)
 	case *uint64:
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = n
 	case *uint32:
 		n, err := strconv.ParseUint(s, 10, 32)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = uint32(n)
 	case *float64:
 		n, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = n
 	case *float32:
 		n, err := strconv.ParseFloat(s, 32)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = float32(n)
 	case *bool:
 		b, err := strconv.ParseBool(s)
 		if err != nil {
-			return zero, err
+			return zero, errorx.Wrap(err)
 		}
 		*p = b
 	default:
-		return zero, fmt.Errorf("unsupported type %T", &zero)
+		return zero, errorx.New("unsupported type %T", &zero)
 	}
 	return zero, nil
 }

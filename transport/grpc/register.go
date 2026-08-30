@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/url"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/transport/ip"
 	"github.com/neo532/gofr/transport/route"
+	"github.com/neo532/gokit/errorx"
 )
 
 // ServerOption configures the gRPC server.
@@ -101,7 +101,7 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 func (s *Server) Endpoint() (*url.URL, error) {
 	host, port, err := net.SplitHostPort(s.address)
 	if err != nil {
-		return nil, fmt.Errorf("endpoint grpc: %q: %w", s.address, err)
+		return nil, errorx.Wrapf(err, "endpoint grpc: %q", s.address)
 	}
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = s.endpointHost
@@ -186,7 +186,7 @@ func (s *Server) Start(ctx context.Context) error {
 		var err error
 		s.lis, err = net.Listen("tcp", s.address)
 		if err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 	close(s.ready)
@@ -199,7 +199,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.GracefulStop()
 	}()
 
-	return s.Server.Serve(s.lis)
+	return errorx.Wrap(s.Server.Serve(s.lis))
 }
 
 // Stop implements transport.Server with context deadline.
@@ -288,7 +288,7 @@ func registerService(s *Server, serviceName string, svr any, methods []ServiceMe
 			Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 				req := md.NewReq()
 				if err := dec(req); err != nil {
-					return nil, err
+					return nil, errorx.Wrap(err)
 				}
 
 				if interceptor != nil {
@@ -306,4 +306,3 @@ func registerService(s *Server, serviceName string, svr any, methods []ServiceMe
 	}
 	s.Server.RegisterService(desc, svr)
 }
-

@@ -12,6 +12,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 var _ client.Client = (*Client)(nil)
@@ -42,7 +43,7 @@ func NewClient(addr string, opts ...client.Option) (*grpc.ClientConn, error) {
 	if o.Retry != nil {
 		cfg, err := grpcServiceConfig(*o.Retry)
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		dial = append(dial, grpc.WithDefaultServiceConfig(cfg))
 	}
@@ -67,10 +68,10 @@ func grpcInterceptor(chain middleware.Middleware) grpc.UnaryClientInterceptor {
 			}
 			ic := metadata.NewOutgoingContext(ctx, out)
 			err := invoker(ic, method, r, reply, cc, opts...)
-			return reply, err
+			return reply, errorx.Wrap(err)
 		}
 		_, err := chain(core)(ctx, req)
-		return err
+		return errorx.Wrap(err)
 	}
 }
 

@@ -3,13 +3,13 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/neo532/gofr/registry"
+	"github.com/neo532/gokit/errorx"
 )
 
 const (
@@ -56,16 +56,16 @@ func (r *Registrar) groupOf(inst *registry.ServiceInstance) string {
 
 func (r *Registrar) Register(ctx context.Context, instance *registry.ServiceInstance) error {
 	if instance == nil || instance.ID == "" || instance.Name == "" {
-		return fmt.Errorf("registry: instance ID and Name are required")
+		return errorx.New("registry: instance ID and Name are required")
 	}
 	group := r.groupOf(instance)
 	key := r.cfg.keyPrefix + group + ":" + instance.Name + ":" + instance.ID
 	data, err := json.Marshal(instance)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	if err := r.client.Set(ctx, key, data, r.cfg.ttl).Err(); err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	r.publish(ctx, group, instance.Name)
 
@@ -73,7 +73,7 @@ func (r *Registrar) Register(ctx context.Context, instance *registry.ServiceInst
 	defer r.mu.Unlock()
 	if r.closed {
 		r.client.Del(context.Background(), key)
-		return fmt.Errorf("registry: registrar closed")
+		return errorx.New("registry: registrar closed")
 	}
 	if _, ok := r.registered[key]; ok {
 		return nil // heartbeat already running for this instance
@@ -99,12 +99,12 @@ func (r *Registrar) Deregister(ctx context.Context, instance *registry.ServiceIn
 	if err == nil {
 		r.publish(ctx, group, instance.Name)
 	}
-	return err
+	return errorx.Wrap(err)
 }
 
 // Check verifies the registry is reachable (fail-fast startup gate).
 func (r *Registrar) Check(ctx context.Context) error {
-	return r.client.Ping(ctx).Err()
+	return errorx.Wrap(r.client.Ping(ctx).Err())
 }
 
 func (r *Registrar) Close() error {
@@ -119,7 +119,7 @@ func (r *Registrar) Close() error {
 		delete(r.registered, key)
 	}
 	// Remaining keys expire on their own TTL; the App Deregisters before Close.
-	return r.client.Close()
+	return errorx.Wrap(r.client.Close())
 }
 
 // heartbeat renews the key lease until cancelled. It runs on its own context:

@@ -98,9 +98,9 @@ type scriptTransport struct {
 	args    []string
 }
 
-func (t *scriptTransport) Kind() transport.Kind           { return transport.KindScript }
+func (t *scriptTransport) Kind() transport.Kind            { return transport.KindScript }
 func (t *scriptTransport) Endpoint() string                { return "" }
-func (t *scriptTransport) Operation() transport.Operation { return transport.Operation{} }
+func (t *scriptTransport) Operation() transport.Operation  { return transport.Operation{} }
 func (t *scriptTransport) RequestHeader() transport.Header { return nil }
 func (t *scriptTransport) ReplyHeader() transport.Header   { return nil }
 func (t *scriptTransport) App() transport.App              { return t.app }
@@ -209,6 +209,7 @@ func (s *Server) Start(c context.Context) (err error) {
 		return errorx.New("script name required")
 	}
 	if err = s.run(c, args); err != nil {
+		err = errorx.Wrap(err)
 		return
 	}
 	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
@@ -237,9 +238,9 @@ func (s *Server) run(c context.Context, args []string) (err error) {
 		_, err = chain(func(ctx context.Context, req any) (any, error) {
 			return nil, fn(ctx, args[1:]...)
 		})(c, nil)
-		return
+		return errorx.Wrap(err)
 	}
-	return fn(c, args[1:]...)
+	return errorx.Wrap(fn(c, args[1:]...))
 }
 
 // Stop is a no-op; shutdown is handled by Start signalling SIGINT.

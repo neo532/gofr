@@ -11,6 +11,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 var _ client.Client = (*Client)(nil)
@@ -48,7 +49,7 @@ func NewClient(service string, addrs []string, opts ...client.Option) (rpcxClien
 	}
 	d, err := rpcxClient.NewMultipleServersDiscovery(pairs)
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	opt := rpcxClient.DefaultOption
 	opt.SerializeType = protocol.ProtoBuffer
@@ -90,8 +91,8 @@ func (w *rpcxWrapped) Call(ctx context.Context, serviceMethod string, args, repl
 	core := func(ctx context.Context, r any) (any, error) {
 		c := context.WithValue(ctx, share.ReqMetaDataKey, meta)
 		err := w.XClient.Call(c, serviceMethod, r, reply)
-		return reply, err
+		return reply, errorx.Wrap(err)
 	}
 	_, err := w.chain(core)(ctx, args)
-	return err
+	return errorx.Wrap(err)
 }

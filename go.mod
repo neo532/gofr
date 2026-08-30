@@ -6,3 +6,5 @@ require (
 	github.com/neo532/gokit v1.0.50
 	golang.org/x/sync v0.20.0
 )
+
+replace github.com/neo532/gokit => ../gokit

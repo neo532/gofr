@@ -3,14 +3,13 @@ package etcd
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/neo532/gofr/registry"
+	"github.com/neo532/gokit/errorx"
 )
 
 const (
@@ -22,9 +21,9 @@ const (
 // KeepAlive renews the lease until the instance is Deregistered or the
 // process crashes (lease then expires and etcd removes the key itself).
 type Registrar struct {
-	client *clientv3.Client
+	client    *clientv3.Client
 	keyPrefix string
-	ttl    time.Duration
+	ttl       time.Duration
 
 	mu     sync.Mutex
 	leases map[string]leaseInfo
@@ -43,7 +42,7 @@ func NewRegistrar(endpoints []string, opts ...Option) (*Registrar, error) {
 	}
 	cli, err := clientv3.New(cfg)
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	r := &Registrar{
 		client:    cli,
@@ -68,20 +67,20 @@ func (r *Registrar) key(inst *registry.ServiceInstance) string {
 
 func (r *Registrar) Register(ctx context.Context, instance *registry.ServiceInstance) error {
 	if instance == nil || instance.ID == "" || instance.Name == "" {
-		return fmt.Errorf("registry: instance ID and Name are required")
+		return errorx.New("registry: instance ID and Name are required")
 	}
 	key := r.key(instance)
 	data, err := json.Marshal(instance)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	leaseResp, err := r.client.Grant(ctx, int64(r.ttl.Seconds()))
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	if _, err := r.client.Put(ctx, key, string(data), clientv3.WithLease(leaseResp.ID)); err != nil {
 		r.client.Revoke(context.Background(), leaseResp.ID)
-		return err
+		return errorx.Wrap(err)
 	}
 
 	kaCtx, cancel := context.WithCancel(context.Background())
@@ -91,7 +90,7 @@ func (r *Registrar) Register(ctx context.Context, instance *registry.ServiceInst
 		cancel()
 		r.client.Delete(context.Background(), key)
 		r.client.Revoke(context.Background(), leaseResp.ID)
-		return fmt.Errorf("registry: registrar closed")
+		return errorx.New("registry: registrar closed")
 	}
 	if prev, ok := r.leases[key]; ok {
 		prev.cancel() // replace: only one keepalive per instance
@@ -99,7 +98,7 @@ func (r *Registrar) Register(ctx context.Context, instance *registry.ServiceInst
 	if _, err := r.client.KeepAlive(kaCtx, leaseResp.ID); err != nil {
 		cancel()
 		r.client.Revoke(context.Background(), leaseResp.ID)
-		return err
+		return errorx.Wrap(err)
 	}
 	r.leases[key] = leaseInfo{id: leaseResp.ID, cancel: cancel}
 	return nil
@@ -118,16 +117,16 @@ func (r *Registrar) Deregister(ctx context.Context, instance *registry.ServiceIn
 		r.client.Revoke(context.Background(), info.id)
 	}
 	_, err := r.client.Delete(ctx, key)
-	return err
+	return errorx.Wrap(err)
 }
 
 // Check verifies the registry is reachable (fail-fast startup gate).
 func (r *Registrar) Check(ctx context.Context) error {
 	if len(r.client.Endpoints()) == 0 {
-		return errors.New("registry: no endpoints configured")
+		return errorx.New("registry: no endpoints configured")
 	}
 	_, err := r.client.Status(ctx, r.client.Endpoints()[0])
-	return err
+	return errorx.Wrap(err)
 }
 
 func (r *Registrar) Close() error {
@@ -143,5 +142,5 @@ func (r *Registrar) Close() error {
 		r.client.Revoke(context.Background(), info.id)
 	}
 	// Remaining keys expire with their leases; the App Deregisters before Close.
-	return r.client.Close()
+	return errorx.Wrap(r.client.Close())
 }

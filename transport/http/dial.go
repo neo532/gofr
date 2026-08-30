@@ -2,11 +2,11 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 
 	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 // Dial builds an *http.Client from a registry instance set, returning the first
@@ -17,7 +17,7 @@ func Dial(opts ...client.Option) client.DialFunc {
 	return func(_ context.Context, instances []*registry.ServiceInstance) (any, string, func(), error) {
 		baseURL, ok := firstBaseURL(instances, "http")
 		if !ok {
-			return nil, "", nil, fmt.Errorf("http: no http endpoint in %+v", instances)
+			return nil, "", nil, errorx.New("http: no http endpoint in %+v", instances)
 		}
 		return NewClient(opts...), baseURL, func() {}, nil
 	}

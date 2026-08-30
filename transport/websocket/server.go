@@ -20,7 +20,6 @@ package websocket
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -34,6 +33,7 @@ import (
 	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/transport/ip"
+	"github.com/neo532/gokit/errorx"
 )
 
 // BinaryMessage is a sent for WebSocket binary frames (matches gorilla/websocket.BinaryMessage).
@@ -155,7 +155,7 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 func (s *Server) Endpoint() (*url.URL, error) {
 	host, port, err := net.SplitHostPort(s.address)
 	if err != nil {
-		return nil, fmt.Errorf("endpoint ws: %q: %w", s.address, err)
+		return nil, errorx.Wrapf(err, "endpoint ws: %q", s.address)
 	}
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = s.endpointHost
@@ -211,7 +211,7 @@ func (s *Server) Start(ctx context.Context) error {
 		var err error
 		s.lis, err = net.Listen("tcp", s.address)
 		if err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 	close(s.ready)
@@ -227,7 +227,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.httpSrv.Close()
 	}()
 
-	return s.httpSrv.Serve(s.lis)
+	return errorx.Wrap(s.httpSrv.Serve(s.lis))
 }
 
 // Stop implements transport.Server.

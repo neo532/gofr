@@ -60,9 +60,10 @@ func TestScriptRunsMiddlewareWithCommand(t *testing.T) {
 }
 
 func TestScriptMiddlewareError(t *testing.T) {
+	boom := errors.New("boom")
 	s := New(map[string]Func{
 		"boom": func(ctx context.Context, args ...string) error {
-			return errors.New("boom")
+			return boom
 		},
 	}, Middleware(func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (any, error) {
@@ -70,7 +71,7 @@ func TestScriptMiddlewareError(t *testing.T) {
 		}
 	}))
 
-	if err := s.run(context.Background(), []string{"boom"}); err == nil || err.Error() != "boom" {
+	if err := s.run(context.Background(), []string{"boom"}); err == nil || !errors.Is(err, boom) {
 		t.Fatalf("got error %v, want boom", err)
 	}
 }

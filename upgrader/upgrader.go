@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/neo532/gokit/errorx"
 )
 
 const (
@@ -82,14 +84,14 @@ func (u *Upgrader) Listen(network, addr string) (net.Listener, error) {
 func (u *Upgrader) createListener(network, addr string) (net.Listener, error) {
 	lis, err := net.Listen(network, addr)
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	// Get dup fd for inheritance. ExtraFiles[0]=readyPipe at fd3,
 	// so first listener goes to fd4, second to fd5, etc.
 	f, err := listenerFile(lis)
 	if err != nil {
 		lis.Close()
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	u.files = append(u.files, f)
 	u.metas = append(u.metas, meta{Network: network, Address: addr})
@@ -98,7 +100,7 @@ func (u *Upgrader) createListener(network, addr string) (net.Listener, error) {
 
 func (u *Upgrader) recoverListener(network, addr string) (net.Listener, error) {
 	if u.seq >= len(u.metas) {
-		return nil, fmt.Errorf("upgrader: no inherited fd for %s %s (seq=%d, total=%d)", network, addr, u.seq, len(u.metas))
+		return nil, errorx.New("upgrader: no inherited fd for %s %s (seq=%d, total=%d)", network, addr, u.seq, len(u.metas))
 	}
 	// ExtraFiles layout: [0]=readyPipe(fd3), [1]=listener0(fd4), [2]=listener1(fd5)...
 	fd := 4 + u.seq
@@ -106,7 +108,7 @@ func (u *Upgrader) recoverListener(network, addr string) (net.Listener, error) {
 	defer f.Close()
 	lis, err := net.FileListener(f)
 	if err != nil {
-		return nil, fmt.Errorf("upgrader: recover %s %s (fd=%d): %w", network, addr, fd, err)
+		return nil, errorx.Wrapf(err, "upgrader: recover %s %s (fd=%d)", network, addr, fd)
 	}
 	u.seq++
 	return lis, nil
@@ -118,7 +120,7 @@ func (u *Upgrader) Ready() error {
 	if u.readyW != nil {
 		defer u.readyW.Close()
 		_, err := u.readyW.Write([]byte("ready"))
-		return err
+		return errorx.Wrap(err)
 	}
 	return nil
 }
@@ -128,13 +130,13 @@ func (u *Upgrader) Ready() error {
 // The parent should stop its servers and exit after Upgrade returns.
 func (u *Upgrader) Upgrade() error {
 	if len(u.files) == 0 {
-		return fmt.Errorf("upgrader: no listeners to inherit")
+		return errorx.New("upgrader: no listeners to inherit")
 	}
 
 	// Create a pipe for ready notification.
 	r, w, err := os.Pipe()
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	defer r.Close()
 
@@ -160,7 +162,7 @@ func (u *Upgrader) Upgrade() error {
 
 	if err := cmd.Start(); err != nil {
 		w.Close()
-		return err
+		return errorx.Wrap(err)
 	}
 	w.Close() // parent doesn't write
 
@@ -168,10 +170,10 @@ func (u *Upgrader) Upgrade() error {
 	buf := make([]byte, 16)
 	n, err := r.Read(buf)
 	if err != nil {
-		return fmt.Errorf("upgrader: waiting for child ready: %w", err)
+		return errorx.Wrapf(err, "upgrader: waiting for child ready")
 	}
 	if string(buf[:n]) != "ready" {
-		return fmt.Errorf("upgrader: unexpected child signal: %q", buf[:n])
+		return errorx.New("upgrader: unexpected child signal: %q", buf[:n])
 	}
 
 	// Close dup fds in parent — child has them now.
@@ -187,8 +189,9 @@ func (u *Upgrader) Upgrade() error {
 func listenerFile(lis net.Listener) (*os.File, error) {
 	switch l := lis.(type) {
 	case *net.TCPListener:
-		return l.File()
+		f, err := l.File()
+		return f, errorx.Wrap(err)
 	default:
-		return nil, fmt.Errorf("upgrader: unsupported listener type %T", lis)
+		return nil, errorx.New("upgrader: unsupported listener type %T", lis)
 	}
 }

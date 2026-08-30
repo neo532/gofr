@@ -3,13 +3,13 @@ package etcd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sort"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/neo532/gofr/registry"
+	"github.com/neo532/gokit/errorx"
 )
 
 // pollInterval backs up etcd Watch events; the watch stream is authoritative,
@@ -31,7 +31,7 @@ func NewDiscovery(endpoints []string, opts ...DiscoveryOption) (*Discovery, erro
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	d := &Discovery{client: cli}
 	for _, o := range opts {
@@ -56,7 +56,7 @@ func (d *Discovery) GetService(ctx context.Context, name string) ([]*registry.Se
 	for _, g := range d.groups() {
 		instances, err := d.getInGroup(ctx, g, name)
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		if len(instances) > 0 {
 			return instances, nil
@@ -68,13 +68,13 @@ func (d *Discovery) GetService(ctx context.Context, name string) ([]*registry.Se
 func (d *Discovery) getInGroup(ctx context.Context, group, name string) ([]*registry.ServiceInstance, error) {
 	resp, err := d.client.Get(ctx, d.prefix(group, name), clientv3.WithPrefix())
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	var instances []*registry.ServiceInstance
 	for _, kv := range resp.Kvs {
 		var inst registry.ServiceInstance
 		if err := json.Unmarshal(kv.Value, &inst); err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		instances = append(instances, &inst)
 	}
@@ -97,14 +97,14 @@ func (d *Discovery) Watch(ctx context.Context, name string) (registry.Watcher, e
 // Check verifies the registry is reachable (fail-fast startup gate).
 func (d *Discovery) Check(ctx context.Context) error {
 	if len(d.client.Endpoints()) == 0 {
-		return errors.New("registry: no endpoints configured")
+		return errorx.New("registry: no endpoints configured")
 	}
 	_, err := d.client.Status(ctx, d.client.Endpoints()[0])
-	return err
+	return errorx.Wrap(err)
 }
 
 func (d *Discovery) Close() error {
-	return d.client.Close()
+	return errorx.Wrap(d.client.Close())
 }
 
 type watcher struct {
@@ -119,7 +119,7 @@ type watcher struct {
 func (w *watcher) Next() ([]*registry.ServiceInstance, error) {
 	instances, ok := <-w.ch
 	if !ok {
-		return nil, errors.New("registry: watch closed")
+		return nil, errorx.New("registry: watch closed")
 	}
 	return instances, nil
 }

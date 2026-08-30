@@ -18,3 +18,5 @@ require (
 )
 
 replace github.com/neo532/gofr => ../../
+
+replace github.com/neo532/gokit => ../../../gokit

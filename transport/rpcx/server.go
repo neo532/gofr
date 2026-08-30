@@ -2,7 +2,6 @@ package rpcx
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/url"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/transport/ip"
+	"github.com/neo532/gokit/errorx"
 )
 
 // ServerOption configures the rpcx server.
@@ -122,7 +122,7 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 func (s *Server) Endpoint() (*url.URL, error) {
 	host, port, err := net.SplitHostPort(s.address)
 	if err != nil {
-		return nil, fmt.Errorf("endpoint rpcx: %q: %w", s.address, err)
+		return nil, errorx.Wrapf(err, "endpoint rpcx: %q", s.address)
 	}
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = s.endpointHost
@@ -165,7 +165,7 @@ func (s *Server) Start(ctx context.Context) error {
 		var err error
 		s.lis, err = net.Listen(s.network, s.address)
 		if err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 	close(s.ready)

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/neo532/gofr/middleware"
+	"github.com/neo532/gokit/errorx"
 )
 
 // Validator returns a middleware that calls Validate() on the request
@@ -13,7 +14,7 @@ func Validator() middleware.Middleware {
 		return func(ctx context.Context, req any) (any, error) {
 			if v, ok := req.(interface{ Validate() error }); ok {
 				if err := v.Validate(); err != nil {
-					return nil, err
+					return nil, errorx.Wrap(err)
 				}
 			}
 			return next(ctx, req)

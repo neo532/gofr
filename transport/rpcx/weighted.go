@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 // Endpoint is a single backend with an explicit load-balancing weight. Weight 0
@@ -37,7 +38,7 @@ func NewClientWithEndpoints(service string, endpoints []Endpoint, opts ...client
 	}
 	d, err := rpcxClient.NewMultipleServersDiscovery(pairs)
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	opt := rpcxClient.DefaultOption
 	opt.SerializeType = protocol.ProtoBuffer

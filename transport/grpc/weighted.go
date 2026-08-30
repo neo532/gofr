@@ -12,6 +12,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 // gofrWeightScheme is the one-off resolver scheme used by
@@ -59,7 +60,7 @@ func NewClientWithEndpoints(endpoints []Endpoint, opts ...client.Option) (*grpc.
 
 	cfg, err := weightedServiceConfig(o.Retry)
 	if err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	dial = append(dial, grpc.WithDefaultServiceConfig(cfg))
 
@@ -78,7 +79,7 @@ func weightedServiceConfig(retry *client.RetryConfig) (string, error) {
 	}
 	rc, err := grpcServiceConfig(*retry)
 	if err != nil {
-		return "", err
+		return "", errorx.Wrap(err)
 	}
 	// rc is {"methodConfig":[...]} — splice the load-balancing policy in.
 	return `{"loadBalancingPolicy":"` + gofrWeightedPolicy + `",` + rc[1:], nil
@@ -104,7 +105,7 @@ func (b *endpointsResolverBuilder) Build(_ resolver.Target, cc resolver.ClientCo
 		})
 	}
 	if err := cc.UpdateState(resolver.State{Addresses: addrs}); err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	return &noopResolver{}, nil
 }

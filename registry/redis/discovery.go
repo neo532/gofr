@@ -3,13 +3,13 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sort"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/neo532/gofr/registry"
+	"github.com/neo532/gokit/errorx"
 )
 
 type Discovery struct {
@@ -40,7 +40,7 @@ func (d *Discovery) GetService(ctx context.Context, name string) ([]*registry.Se
 	for _, g := range d.groups() {
 		instances, err := d.getInGroup(ctx, g, name)
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		if len(instances) > 0 {
 			return instances, nil
@@ -59,16 +59,16 @@ func (d *Discovery) getInGroup(ctx context.Context, group, name string) ([]*regi
 			continue // lease expired between scan and get
 		}
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		var inst registry.ServiceInstance
 		if err := json.Unmarshal(data, &inst); err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		instances = append(instances, &inst)
 	}
 	if err := iter.Err(); err != nil {
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	return instances, nil
 }
@@ -81,7 +81,7 @@ func (d *Discovery) Watch(ctx context.Context, name string) (registry.Watcher, e
 	pubsub := d.client.Subscribe(ctx, channels...)
 	if _, err := pubsub.Receive(ctx); err != nil {
 		pubsub.Close()
-		return nil, err
+		return nil, errorx.Wrap(err)
 	}
 	wCtx, cancel := context.WithCancel(ctx)
 	w := &watcher{
@@ -100,11 +100,11 @@ func (d *Discovery) Watch(ctx context.Context, name string) (registry.Watcher, e
 
 // Check verifies the registry is reachable (fail-fast startup gate).
 func (d *Discovery) Check(ctx context.Context) error {
-	return d.client.Ping(ctx).Err()
+	return errorx.Wrap(d.client.Ping(ctx).Err())
 }
 
 func (d *Discovery) Close() error {
-	return d.client.Close()
+	return errorx.Wrap(d.client.Close())
 }
 
 type watcher struct {
@@ -122,7 +122,7 @@ type watcher struct {
 func (w *watcher) Next() ([]*registry.ServiceInstance, error) {
 	instances, ok := <-w.ch
 	if !ok {
-		return nil, errors.New("registry: watch closed")
+		return nil, errorx.New("registry: watch closed")
 	}
 	return instances, nil
 }

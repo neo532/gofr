@@ -3,7 +3,8 @@ module github.com/neo532/gofr/registry/etcd
 go 1.26
 
 require (
-	github.com/neo532/gofr v0.0.0
+	github.com/neo532/gofr v0.0.0-00010101000000-000000000000
+	github.com/neo532/gokit v1.0.50
 	go.etcd.io/etcd/client/v3 v3.7.1
 	go.etcd.io/etcd/server/v3 v3.7.1
 )
@@ -68,3 +69,5 @@ require (
 )
 
 replace github.com/neo532/gofr => ../../
+
+replace github.com/neo532/gokit => ../../../gokit

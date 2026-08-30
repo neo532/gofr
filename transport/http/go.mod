@@ -11,3 +11,5 @@ require (
 require google.golang.org/protobuf v1.36.11
 
 replace github.com/neo532/gofr => ../../
+
+replace github.com/neo532/gokit => ../../../gokit

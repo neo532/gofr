@@ -2,12 +2,13 @@ package rpcx
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 
 	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport/client"
 	rpcxClient "github.com/smallnest/rpcx/client"
+
+	"github.com/neo532/gokit/errorx"
 )
 
 // Dial builds one XClient per rpcx service in serviceNames, all over the same
@@ -19,7 +20,7 @@ func Dial(serviceNames []string, opts ...client.Option) client.DialFunc {
 	return func(_ context.Context, instances []*registry.ServiceInstance) (any, string, func(), error) {
 		endpoints := rpcxEndpoints(instances)
 		if len(endpoints) == 0 {
-			return nil, "", nil, fmt.Errorf("rpcx: no rpcx endpoint in %+v", instances)
+			return nil, "", nil, errorx.New("rpcx: no rpcx endpoint in %+v", instances)
 		}
 		xcs := make(map[string]rpcxClient.XClient, len(serviceNames))
 		closeAll := func() {
@@ -31,7 +32,7 @@ func Dial(serviceNames []string, opts ...client.Option) client.DialFunc {
 			xc, err := NewClientWithEndpoints(svcName, endpoints, opts...)
 			if err != nil {
 				closeAll()
-				return nil, "", nil, err
+				return nil, "", nil, errorx.Wrap(err)
 			}
 			xcs[svcName] = xc
 		}

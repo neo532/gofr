@@ -12,6 +12,7 @@ import (
 	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/transport/route"
+	"github.com/neo532/gokit/errorx"
 )
 
 // middlewarePlugin adapts MiddlewareManager to rpcx's PreCallPlugin/PostCallPlugin.
@@ -101,7 +102,7 @@ func (p *middlewarePlugin) PreCall(ctx context.Context, servicePath, serviceMeth
 	}
 	out, err := h(base, args)
 	if err != nil {
-		return out, err
+		return out, errorx.Wrap(err)
 	}
 	if shareCtx != nil && chainCtx != nil {
 		shareCtx.Context = chainCtx

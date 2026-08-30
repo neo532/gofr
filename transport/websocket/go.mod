@@ -11,3 +11,5 @@ require (
 require github.com/neo532/gokit v1.0.48 // indirect
 
 replace github.com/neo532/gofr => ../../
+
+replace github.com/neo532/gokit => ../../../gokit

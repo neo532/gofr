@@ -3,7 +3,6 @@ package http
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 var _ client.Client = (*clientImpl)(nil)
@@ -63,7 +63,7 @@ func httpTripper(chain middleware.Middleware, base http.RoundTripper) http.Round
 		}
 		out, err := chain(core)(ctx, req)
 		resp, _ := out.(*http.Response)
-		return resp, err
+		return resp, errorx.Wrap(err)
 	})
 }
 
@@ -93,7 +93,7 @@ func (t *retryTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		body, err = io.ReadAll(req.Body)
 		req.Body.Close()
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 	}
 	backoff := t.retry.InitialBackoff
@@ -110,7 +110,7 @@ func (t *retryTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 				return resp, nil
 			}
 			resp.Body.Close()
-			lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+			lastErr = errorx.New("HTTP %d", resp.StatusCode)
 		}
 		if attempt >= t.retry.MaxAttempts {
 			return nil, lastErr

@@ -2,12 +2,12 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"sync/atomic"
 
 	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport"
+	"github.com/neo532/gokit/errorx"
 	"github.com/neo532/gokit/logger"
 )
 
@@ -42,7 +42,7 @@ func (d Dialers) Dial(kind transport.Kind) (DialFunc, error) {
 	case transport.KindWebSocket:
 		return d.WS, nil
 	}
-	return nil, fmt.Errorf("transport: no dialer for protocol %q", kind)
+	return nil, errorx.New("transport: no dialer for protocol %q", kind)
 }
 
 // clientState bundles a dialed client with the cleanup that releases its
@@ -75,15 +75,15 @@ type FollowClient[T any] struct {
 func NewFollowClient[T any](ctx context.Context, disc registry.Discovery, svc string, dials Dialers, assemble func(kind string, handle any, baseURL string) T) (*FollowClient[T], func(), error) {
 	instances, err := disc.GetService(ctx, svc)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errorx.Wrap(err)
 	}
 	if len(instances) == 0 {
-		return nil, nil, fmt.Errorf("registry: no instance for %q", svc)
+		return nil, nil, errorx.New("registry: no instance for %q", svc)
 	}
 	kind := transport.Kind(instances[0].Protocol)
 	dial, err := dials.Dial(kind)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errorx.Wrap(err)
 	}
 	log := dials.Logger
 	if log == nil {
@@ -99,7 +99,7 @@ func NewFollowClient[T any](ctx context.Context, disc registry.Discovery, svc st
 		done:     make(chan struct{}),
 	}
 	if err := fc.redial(ctx, instances); err != nil {
-		return nil, nil, err
+		return nil, nil, errorx.Wrap(err)
 	}
 	go fc.run(ctx, disc)
 	return fc, fc.Close, nil
@@ -144,7 +144,7 @@ func (f *FollowClient[T]) recoverPanic(tag string) {
 func (f *FollowClient[T]) redial(ctx context.Context, instances []*registry.ServiceInstance) error {
 	handle, baseURL, cleanup, err := f.dial(ctx, instances)
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	old := f.state.Swap(&clientState[T]{uc: f.assemble(string(f.kind), handle, baseURL), cleanup: cleanup})
 	if old != nil && old.cleanup != nil {

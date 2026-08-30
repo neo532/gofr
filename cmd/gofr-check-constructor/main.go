@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/neo532/gokit/errorx"
 )
 
 func main() {
@@ -42,7 +44,7 @@ func main() {
 
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				return errorx.Wrap(err)
 			}
 			if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil

@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo532/gofr/middleware"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 var _ client.Client = (*clientImpl)(nil)
@@ -64,10 +65,10 @@ func (d *wsMetaDialer) DialContext(ctx context.Context, urlStr string, requestHe
 	core := func(ctx context.Context, _ any) (any, error) {
 		var err error
 		conn, resp, err = d.Dialer.DialContext(ctx, urlStr, requestHeader)
-		return conn, err
+		return conn, errorx.Wrap(err)
 	}
 	_, err := d.chain(core)(ctx, urlStr)
-	return conn, resp, err
+	return conn, resp, errorx.Wrap(err)
 }
 
 // wsRetryDialer retries a failed dial with exponential backoff.

@@ -2,11 +2,11 @@ package websocket
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 
 	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport/client"
+	"github.com/neo532/gokit/errorx"
 )
 
 // Dial builds a WSDialer from a registry instance set, returning the first
@@ -20,7 +20,7 @@ func Dial(opts ...client.Option) client.DialFunc {
 			baseURL, ok = firstBaseURL(instances, "websocket")
 		}
 		if !ok {
-			return nil, "", nil, fmt.Errorf("websocket: no websocket endpoint in %+v", instances)
+			return nil, "", nil, errorx.New("websocket: no websocket endpoint in %+v", instances)
 		}
 		return NewClient(opts...), baseURL, func() {}, nil
 	}

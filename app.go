@@ -3,7 +3,6 @@ package gofr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -16,6 +15,7 @@ import (
 	"github.com/neo532/gofr/registry"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/upgrader"
+	"github.com/neo532/gokit/errorx"
 	"github.com/neo532/gokit/logger"
 )
 
@@ -63,7 +63,7 @@ func (a *App) Run() error {
 			if ls, ok := srv.(transport.ListenerServer); ok {
 				lis, err := upg.Listen("tcp", ls.Addr())
 				if err != nil {
-					return err
+					return errorx.Wrap(err)
 				}
 				ls.SetListener(lis)
 			}
@@ -78,7 +78,7 @@ func (a *App) Run() error {
 	// beforeStart hooks
 	for _, fn := range a.opts.beforeStart {
 		if err := fn(ctx); err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func (a *App) Run() error {
 		checkCtx, cancel := context.WithTimeout(ctx, a.opts.registrarTimeout)
 		if err := a.opts.registrar.Check(checkCtx); err != nil {
 			cancel()
-			return err
+			return errorx.Wrap(err)
 		}
 		cancel()
 	}
@@ -123,19 +123,19 @@ func (a *App) Run() error {
 
 	if err := a.register(); err != nil {
 		a.cancel()
-		return err
+		return errorx.Wrap(err)
 	}
 
 	// afterStart hooks
 	for _, fn := range a.opts.afterStart {
 		if err := fn(ctx); err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 
 	// Write PID file after all init (including afterStart health checks) succeed.
 	if err := a.WritePID(); err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 
 	// If this is the upgraded child, signal parent we're ready.
@@ -143,7 +143,7 @@ func (a *App) Run() error {
 	// running and listeners are accepting).
 	if upg != nil && upg.IsChild() {
 		if err := upg.Ready(); err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 
@@ -182,10 +182,10 @@ func (a *App) Run() error {
 
 	for _, fn := range a.opts.afterStop {
 		if err := fn(ctx); err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
-	return a.unregister()
+	return errorx.Wrap(a.unregister())
 }
 
 // Stop gracefully stops the application.
@@ -214,7 +214,7 @@ func (a *App) waitReady(ctx context.Context) error {
 		select {
 		case <-rs.Ready():
 		case <-ctx.Done():
-			return fmt.Errorf("wait ready for %T: %w", srv, ctx.Err())
+			return errorx.Wrapf(ctx.Err(), "wait ready for %T", srv)
 		}
 	}
 	return nil
@@ -229,12 +229,12 @@ func (a *App) register() error {
 	}
 	inst, err := a.buildInstance()
 	if err != nil {
-		return err
+		return errorx.Wrap(err)
 	}
 	ctx, cancel := context.WithTimeout(a.opts.ctx, a.opts.registrarTimeout)
 	defer cancel()
 	if err := a.opts.registrar.Register(ctx, inst); err != nil {
-		return fmt.Errorf("register %s: %w", inst.Name, err)
+		return errorx.Wrapf(err, "register %s", inst.Name)
 	}
 	a.instance = inst
 	return nil
@@ -256,7 +256,7 @@ func (a *App) unregister() error {
 	if cerr := a.opts.registrar.Close(); cerr != nil && err == nil {
 		err = cerr
 	}
-	return err
+	return errorx.Wrap(err)
 }
 
 // buildInstance assembles the ServiceInstance from each server's advertised
@@ -281,7 +281,7 @@ func (a *App) buildInstance() (*registry.ServiceInstance, error) {
 	} else {
 		host, err := os.Hostname()
 		if err != nil {
-			return nil, err
+			return nil, errorx.Wrap(err)
 		}
 		inst.ID = host + ":" + strconv.Itoa(os.Getpid())
 	}
@@ -292,7 +292,7 @@ func (a *App) buildInstance() (*registry.ServiceInstance, error) {
 		}
 		u, err := ep.Endpoint()
 		if err != nil {
-			return nil, fmt.Errorf("endpoint %T: %w", srv, err)
+			return nil, errorx.Wrapf(err, "endpoint %T", srv)
 		}
 		inst.Endpoints = append(inst.Endpoints, u.String())
 	}
@@ -310,15 +310,17 @@ func (a *App) WritePID() (err error) {
 		}
 	}()
 	if err != nil {
+		err = errorx.Wrap(err)
 		return
 	}
 	var n int
 	n, err = f.Write([]byte(p))
 	if err != nil {
+		err = errorx.Wrap(err)
 		return
 	}
 	if n < len(p) {
-		err = io.ErrShortWrite
+		err = errorx.Wrap(io.ErrShortWrite)
 	}
 	return
 }

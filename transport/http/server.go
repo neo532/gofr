@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +16,7 @@ import (
 	"github.com/neo532/gofr/middleware/manager"
 	"github.com/neo532/gofr/transport"
 	"github.com/neo532/gofr/transport/ip"
+	"github.com/neo532/gokit/errorx"
 )
 
 // ServerOption configures the HTTP server.
@@ -128,7 +128,7 @@ func (s *Server) Ready() <-chan struct{} { return s.ready }
 func (s *Server) Endpoint() (*url.URL, error) {
 	host, port, err := net.SplitHostPort(s.address)
 	if err != nil {
-		return nil, fmt.Errorf("endpoint http: %q: %w", s.address, err)
+		return nil, errorx.Wrapf(err, "endpoint http: %q", s.address)
 	}
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = s.endpointHost
@@ -258,7 +258,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.lis == nil {
 		s.lis, err = net.Listen("tcp", s.address)
 		if err != nil {
-			return err
+			return errorx.Wrap(err)
 		}
 	}
 	close(s.ready)
@@ -303,7 +303,7 @@ func (s *Server) Start(ctx context.Context) error {
 		err = srv.Serve(s.lis)
 	}
 	if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
-		return err
+		return errorx.Wrap(err)
 	}
 	return nil
 }
