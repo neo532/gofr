@@ -5,11 +5,13 @@
 
 
 /cmd/protoc-gen-go-svc/protoc-gen-go-svc
+/cmd/protoc-gen-go-client/protoc-gen-go-client
 /cmd/gofr-manager/gofr-manager
 /cmd/gofr-check-constructor/gofr-check-constructor
 /cmd/gofr-init-project/gofr-init-project
 
 /protoc-gen-go-svc
+/protoc-gen-go-client
 /gofr-manager
 /gofr-check-constructor
 /gofr-init-project
