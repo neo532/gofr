@@ -65,6 +65,5 @@ require (
 replace (
 	github.com/neo532/gofr => ../../
 	github.com/neo532/gofr/middleware/trace => ../../middleware/trace
-	github.com/neo532/gokit => ../../../gokit
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260526163538-3dc84a4a5aaa
 )

@@ -2,6 +2,7 @@ go 1.26.1
 
 use (
 	.
+	../gokit
 	./cmd/protoc-gen-go-client
 	./cmd/protoc-gen-go-svc
 	./example/helloworld
