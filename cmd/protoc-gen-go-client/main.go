@@ -9,7 +9,9 @@ func main() {
 			if !f.Generate {
 				continue
 			}
-			generateFile(gen, f, protos)
+			if err := generateFile(gen, f, protos); err != nil {
+				return err
+			}
 		}
 		generateAggregates(gen)
 		return nil

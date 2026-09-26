@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type protocols struct {
@@ -41,27 +44,14 @@ func parseProtocols(param string) protocols {
 	return p
 }
 
-func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
+func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) error {
 	if len(file.Services) == 0 {
-		return
+		return nil
 	}
 
 	pkg := string(file.GoPackageName)
 
 	// Build shared service descriptors (used by both base client and per-protocol files).
-	// First pass: collect all type imports needed by the base client struct.
-	var baseMethods []methodDesc
-	for _, svc := range file.Services {
-		for _, method := range svc.Methods {
-			baseMethods = append(baseMethods, methodDesc{
-				Name:      method.GoName,
-				FieldName: fieldName(method.GoName),
-				Request:   string(method.Input.GoIdent.GoName),
-				Reply:     string(method.Output.GoIdent.GoName),
-			})
-		}
-	}
-	_ = baseMethods
 
 	// ─── Base client file (_client.pb.go) ───
 	baseFilename := file.GeneratedFilenamePrefix + "_client.pb.go"
@@ -126,66 +116,49 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 		services := buildServices(func(id protogen.GoIdent) string {
 			return g.QualifiedGoIdent(id)
 		})
+		reqs, err := enrichHTTPServices(file, services)
+		if err != nil {
+			return err
+		}
 
-		// Configure each method's HTTP binding and register request/reply
-		// imports. HasBody is computed here, before the import block below,
-		// because it decides whether the bytes import is emitted.
-		hasBody := false
+		imports := httpImportNames{
+			Context:   qualifiedPackage(g, "context", "Context"),
+			Fmt:       qualifiedPackage(g, "fmt", "Errorf"),
+			IO:        qualifiedPackage(g, "io", "ReadAll"),
+			HTTP:      qualifiedPackage(g, "net/http", "Client"),
+			ProtoJSON: qualifiedPackage(g, "google.golang.org/protobuf/encoding/protojson", "MarshalOptions"),
+			Strings:   qualifiedPackage(g, "strings", "TrimSpace"),
+		}
+		if reqs.Bytes {
+			imports.Bytes = qualifiedPackage(g, "bytes", "NewReader")
+		}
+		if reqs.URL {
+			imports.URL = qualifiedPackage(g, "net/url", "Parse")
+		}
+		if reqs.Strconv {
+			imports.Strconv = qualifiedPackage(g, "strconv", "Itoa")
+		}
 		for _, svc := range services {
 			for i := range svc.Methods {
-				m := svc.Methods[i]
-				httpMethod := ""
-				httpPath := ""
-				var params []paramBinding
-
-				for _, ps := range file.Services {
-					if ps.GoName != svc.ServiceType {
-						continue
-					}
-					for _, pm := range ps.Methods {
-						if pm.GoName != m.Name {
-							continue
-						}
-						httpMethod, httpPath = extractHTTPBinding(pm)
-						params = extractPathParams(httpPath)
-					}
-				}
-				svc.Methods[i].HTTPMethod = httpMethod
-				svc.Methods[i].HTTPPath = httpPath
-				svc.Methods[i].PathParams = params
-				svc.Methods[i].HTTPURL = buildURLExpr("baseURL", httpPath, params)
-				svc.Methods[i].HasBody = httpMethod == "POST" || httpMethod == "PUT" || httpMethod == "PATCH"
-				if svc.Methods[i].HasBody {
-					hasBody = true
-				}
-
-				// Register imports needed in closure signatures
-				for _, ps := range file.Services {
-					if ps.GoName != svc.ServiceType {
-						continue
-					}
-					for _, pm := range ps.Methods {
-						if pm.GoName != m.Name {
-							continue
-						}
-						g.QualifiedGoIdent(pm.Input.GoIdent)
-						g.QualifiedGoIdent(pm.Output.GoIdent)
-					}
-				}
+				svc.Methods[i].HTTPCode = replaceHTTPImports(svc.Methods[i].HTTPCode, imports)
 			}
 		}
 
-		// bytes.Buffer is only emitted for methods with a request body; import it
-		// only then, or an all-GET service gets an unused bytes import.
-		if hasBody {
-			g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "bytes", GoName: "Buffer"})
+		data := &fileDesc{
+			PackageName:  pkg,
+			HelperPrefix: helperPrefix(file.GeneratedFilenamePrefix),
+			Services:     services,
+			Context:      imports.Context,
+			Bytes:        imports.Bytes,
+			Fmt:          imports.Fmt,
+			IO:           imports.IO,
+			HTTP:         imports.HTTP,
+			URL:          imports.URL,
+			ProtoJSON:    imports.ProtoJSON,
+			Strconv:      imports.Strconv,
+			Strings:      imports.Strings,
 		}
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context", GoName: "Context"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "encoding/json", GoName: "Encoder"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "fmt", GoName: "Sprint"})
-		g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "net/http", GoName: "Client"})
-
-		output := generateHTTPClient(pkg, services)
+		output := generateHTTPClient(data)
 		for _, line := range splitLines(output) {
 			g.P(line)
 		}
@@ -306,90 +279,381 @@ func generateFile(gen *protogen.Plugin, file *protogen.File, protos protocols) {
 	for _, line := range splitLines(setOutput) {
 		cs.P(line)
 	}
+	return nil
 }
 
-// --- HTTP annotation extraction ---
+func qualifiedPackage(g *protogen.GeneratedFile, importPath, symbol string) string {
+	qualified := g.QualifiedGoIdent(protogen.GoIdent{GoImportPath: protogen.GoImportPath(importPath), GoName: symbol})
+	return strings.TrimSuffix(qualified, "."+symbol)
+}
 
-func extractHTTPBinding(method *protogen.Method) (httpMethod, httpPath string) {
+type httpImportNames struct {
+	Context   string
+	Bytes     string
+	Fmt       string
+	IO        string
+	HTTP      string
+	URL       string
+	ProtoJSON string
+	Strconv   string
+	Strings   string
+}
+
+type httpRequirements struct {
+	Bytes   bool
+	URL     bool
+	Strconv bool
+}
+
+type fieldRef struct {
+	Expr   string
+	Field  *protogen.Field
+	Guards []string
+}
+
+func extractHTTPBinding(method *protogen.Method) (httpMethod, httpPath, body string) {
 	opts := method.Desc.Options()
 	if opts == nil {
-		return "", ""
+		return "", "", ""
 	}
 	rule, ok := proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
 	if !ok || rule == nil {
-		return "", ""
+		return "", "", ""
 	}
 	switch p := rule.Pattern.(type) {
 	case *annotations.HttpRule_Get:
-		return "GET", p.Get
+		return "GET", p.Get, rule.Body
 	case *annotations.HttpRule_Post:
-		return "POST", p.Post
+		return "POST", p.Post, rule.Body
 	case *annotations.HttpRule_Put:
-		return "PUT", p.Put
+		return "PUT", p.Put, rule.Body
 	case *annotations.HttpRule_Delete:
-		return "DELETE", p.Delete
+		return "DELETE", p.Delete, rule.Body
 	case *annotations.HttpRule_Patch:
-		return "PATCH", p.Patch
+		return "PATCH", p.Patch, rule.Body
+	default:
+		return "", "", ""
 	}
-	return "", ""
 }
 
-func extractPathParams(path string) (params []paramBinding) {
-	for i := 0; i < len(path); i++ {
-		if path[i] == '{' {
-			start := i + 1
-			i++
-			for i < len(path) && path[i] != '}' {
-				i++
+func enrichHTTPServices(file *protogen.File, services []*serviceDesc) (httpRequirements, error) {
+	var reqs httpRequirements
+	for si, svc := range file.Services {
+		for mi, method := range svc.Methods {
+			httpMethod, httpPath, body := extractHTTPBinding(method)
+			if httpMethod == "" {
+				httpMethod = "POST"
+				httpPath = fmt.Sprintf("/%s/%s", svc.Desc.FullName(), method.GoName)
 			}
-			if start < i {
-				name := path[start:i]
-				params = append(params, paramBinding{
-					ProtoName: name,
-					GoField:   snakeToPascal(name),
-				})
+			code, methodReqs, err := buildHTTPMethodCode(
+				string(svc.Desc.FullName()), method, httpMethod, httpPath, body,
+				helperPrefix(file.GeneratedFilenamePrefix),
+			)
+			if err != nil {
+				return reqs, err
 			}
+			services[si].Methods[mi].HTTPCode = code
+			reqs.Bytes = reqs.Bytes || methodReqs.Bytes
+			reqs.URL = reqs.URL || methodReqs.URL
+			reqs.Strconv = reqs.Strconv || methodReqs.Strconv
 		}
 	}
-	return
+	return reqs, nil
 }
 
-func snakeToPascal(s string) string {
-	parts := strings.Split(s, "_")
-	for i, p := range parts {
-		if len(p) > 0 {
-			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+func buildHTTPMethodCode(service string, method *protogen.Method, httpMethod, httpPath, body, errorPrefix string) (string, httpRequirements, error) {
+	var reqs httpRequirements
+	pathExpr, pathGuards, pathSelectors, err := buildPathExpr(method.Input, httpPath)
+	if err != nil {
+		return "", reqs, fmt.Errorf("%s.%s: %w", service, method.GoName, err)
+	}
+	reqs.URL = len(pathSelectors) > 0
+
+	excluded := make(map[string]bool, len(pathSelectors)+1)
+	for _, selector := range pathSelectors {
+		excluded[strings.Split(selector, ".")[0]] = true
+	}
+	if body == "*" {
+		if len(pathSelectors) > 0 {
+			return "", reqs, fmt.Errorf("%s.%s: body \"*\" with path fields is unsupported", service, method.GoName)
+		}
+	} else if body != "" {
+		ref, err := resolveFieldPath(method.Input, body)
+		if err != nil {
+			return "", reqs, fmt.Errorf("%s.%s: body %q: %w", service, method.GoName, body, err)
+		}
+		if ref.Field.Desc.Kind() != protoreflect.MessageKind || ref.Field.Desc.IsList() || ref.Field.Desc.IsMap() {
+			return "", reqs, fmt.Errorf("%s.%s: body %q must be a singular message field", service, method.GoName, body)
+		}
+		excluded[strings.Split(body, ".")[0]] = true
+		pathGuards = append(pathGuards, ref.Guards...)
+	}
+
+	var query []string
+	if body != "*" {
+		for _, field := range method.Input.Fields {
+			name := string(field.Desc.Name())
+			if excluded[name] {
+				continue
+			}
+			if field.Desc.IsMap() || field.Desc.Kind() == protoreflect.MessageKind {
+				return "", reqs, fmt.Errorf("%s.%s: query field %q is a message or map", service, method.GoName, name)
+			}
+			if field.Desc.HasPresence() {
+				return "", reqs, fmt.Errorf("%s.%s: query field %q with presence is unsupported", service, method.GoName, name)
+			}
+			if field.Desc.IsList() && field.Desc.Kind() == protoreflect.MessageKind {
+				return "", reqs, fmt.Errorf("%s.%s: repeated message query field %q is unsupported", service, method.GoName, name)
+			}
+			if field.Desc.IsList() {
+				elem, usesStrconv, err := httpValueExpr("v", field, true)
+				if err != nil {
+					return "", reqs, fmt.Errorf("%s.%s: query field %q: %w", service, method.GoName, name, err)
+				}
+				reqs.Strconv = reqs.Strconv || usesStrconv
+				query = append(query, fmt.Sprintf("\tfor _, v := range req.%s {\n\t\tquery.Add(%s, %s)\n\t}", field.GoName, strconv.Quote(name), elem))
+				continue
+			}
+			value, usesStrconv, err := httpValueExpr("req."+field.GoName, field, false)
+			if err != nil {
+				return "", reqs, fmt.Errorf("%s.%s: query field %q: %w", service, method.GoName, name, err)
+			}
+			reqs.Strconv = reqs.Strconv || usesStrconv
+			query = append(query, fmt.Sprintf("\tif %s {\n\t\tquery.Set(%s, %s)\n\t}", queryCondition(field), strconv.Quote(name), value))
 		}
 	}
-	return strings.Join(parts, "")
+
+	var lines []string
+	lines = append(lines, "\tif req == nil {", fmt.Sprintf("\t\treturn nil, fmt.Errorf(%s)", strconv.Quote(service+"."+method.GoName+": nil request")), "\t}")
+	lines = append(lines, pathGuards...)
+	lines = append(lines, "\thttpURL := "+pathExpr)
+	if len(query) > 0 {
+		reqs.URL = true
+		lines = append(lines, "\tu, err := url.Parse(httpURL)", "\tif err != nil {", fmt.Sprintf("\t\treturn nil, fmt.Errorf(%s, err)", strconv.Quote("build "+service+"."+method.GoName+" URL: %w")), "\t}", "\tquery := u.Query()")
+		lines = append(lines, query...)
+		lines = append(lines, "\tu.RawQuery = query.Encode()", "\thttpURL = u.String()")
+	}
+	bodyArg := "nil"
+	if body != "" {
+		reqs.Bytes = true
+		var bodyExpr string
+		if body == "*" {
+			bodyExpr = "req"
+		} else {
+			ref, err := resolveFieldPath(method.Input, body)
+			if err != nil {
+				return "", reqs, err
+			}
+			bodyExpr = ref.Expr
+			lines = append(lines, fmt.Sprintf("\tif %s == nil {\n\t\treturn nil, fmt.Errorf(%s)\n\t}", bodyExpr, strconv.Quote(service+"."+method.GoName+": body field "+body+" is nil")))
+		}
+		lines = append(lines, fmt.Sprintf("\tbodyBytes, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(%s)", bodyExpr), "\tif err != nil {", fmt.Sprintf("\t\treturn nil, fmt.Errorf(%s, err)", strconv.Quote("encode "+service+"."+method.GoName+" request body: %w")), "\t}", "\tbody := bytes.NewReader(bodyBytes)")
+		bodyArg = "body"
+	}
+	lines = append(lines,
+		fmt.Sprintf("\thttpReq, err := http.NewRequestWithContext(ctx, %s, httpURL, %s)", strconv.Quote(httpMethod), bodyArg),
+		"\tif err != nil {",
+		fmt.Sprintf("\t\treturn nil, fmt.Errorf(%s, err)", strconv.Quote("build "+service+"."+method.GoName+" request: %w")),
+		"\t}",
+	)
+	if body != "" {
+		lines = append(lines, "\thttpReq.Header.Set(\"Content-Type\", \"application/json\")")
+	}
+	lines = append(lines,
+		"\thttpResp, err := hc.Do(httpReq)",
+		"\tif err != nil {",
+		"\t\treturn nil, err",
+		"\t}",
+		"\tdefer httpResp.Body.Close()",
+		"\tresponseBody, err := io.ReadAll(httpResp.Body)",
+		"\tif err != nil {",
+		"\t\treturn nil, err",
+		"\t}",
+		"\tif httpResp.StatusCode < http.StatusOK || httpResp.StatusCode >= http.StatusMultipleChoices {",
+		fmt.Sprintf("\t\treturn nil, &%sHTTPError{Method: %s, Status: httpResp.StatusCode, Body: responseBody}", errorPrefix, strconv.Quote(service+"."+method.GoName)),
+		"\t}",
+		fmt.Sprintf("\treply = new(%s)", method.Output.GoIdent.GoName),
+		"\tif len(strings.TrimSpace(string(responseBody))) == 0 {",
+		"\t\treturn reply, nil",
+		"\t}",
+		"\tif err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(responseBody, reply); err != nil {",
+		fmt.Sprintf("\t\treturn nil, fmt.Errorf(%s, err)", strconv.Quote("decode "+service+"."+method.GoName+" response: %w")),
+		"\t}",
+		"\treturn reply, nil",
+	)
+	return strings.Join(lines, "\n"), reqs, nil
 }
 
-func buildURLExpr(prefix, path string, params []paramBinding) string {
-	if len(params) == 0 {
-		if path == "" {
-			return prefix
-		}
-		return prefix + ` + "` + path + `"`
-	}
-
+func buildPathExpr(input *protogen.Message, template string) (string, []string, []string, error) {
 	var parts []string
+	var guards []string
+	var selectors []string
 	pos := 0
-	for _, p := range params {
-		braceStart := strings.Index(path[pos:], "{"+p.ProtoName+"}")
-		if braceStart < 0 {
-			continue
+	for {
+		start := strings.IndexByte(template[pos:], '{')
+		if start < 0 {
+			break
 		}
-		braceStart += pos
-		if braceStart > pos {
-			parts = append(parts, `"`+path[pos:braceStart]+`"`)
+		start += pos
+		end := strings.IndexByte(template[start+1:], '}')
+		if end < 0 {
+			return "", nil, nil, fmt.Errorf("invalid path template %q", template)
 		}
-		parts = append(parts, `fmt.Sprint(req.`+p.GoField+`)`)
-		pos = braceStart + len(p.ProtoName) + 2
+		end += start + 1
+		if start > pos {
+			parts = append(parts, strconv.Quote(template[pos:start]))
+		}
+		selector := template[start+1 : end]
+		if strings.Contains(selector, "=") {
+			return "", nil, nil, fmt.Errorf("complex path template %q is unsupported", selector)
+		}
+		ref, err := resolveFieldPath(input, selector)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("path field %q: %w", selector, err)
+		}
+		value, _, err := httpValueExpr(ref.Expr, ref.Field, false)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("path field %q: %w", selector, err)
+		}
+		parts = append(parts, "url.PathEscape("+value+")")
+		guards = append(guards, ref.Guards...)
+		selectors = append(selectors, selector)
+		pos = end + 1
 	}
-	if pos < len(path) {
-		parts = append(parts, `"`+path[pos:]+`"`)
+	if pos < len(template) {
+		parts = append(parts, strconv.Quote(template[pos:]))
 	}
-	return prefix + ` + ` + strings.Join(parts, " + ")
+	if len(parts) == 0 {
+		parts = append(parts, strconv.Quote(template))
+	}
+	return "baseURL + " + strings.Join(parts, " + "), uniqueStrings(guards), selectors, nil
+}
+
+func resolveFieldPath(input *protogen.Message, selector string) (fieldRef, error) {
+	parts := strings.Split(selector, ".")
+	msg := input
+	expr := "req"
+	var guards []string
+	var field *protogen.Field
+	for i, part := range parts {
+		field = nil
+		for _, candidate := range msg.Fields {
+			if string(candidate.Desc.Name()) == part || candidate.Desc.JSONName() == part {
+				field = candidate
+				break
+			}
+		}
+		if field == nil {
+			return fieldRef{}, fmt.Errorf("field %q not found", selector)
+		}
+		expr += "." + field.GoName
+		if i == len(parts)-1 {
+			break
+		}
+		if field.Desc.Kind() != protoreflect.MessageKind || field.Message == nil || field.Desc.IsList() || field.Desc.IsMap() {
+			return fieldRef{}, fmt.Errorf("field %q is not a message path", parts[i])
+		}
+		guards = append(guards, expr+" == nil")
+		msg = field.Message
+	}
+	if field == nil {
+		return fieldRef{}, fmt.Errorf("empty field selector")
+	}
+	return fieldRef{Expr: expr, Field: field, Guards: guards}, nil
+}
+
+func queryCondition(field *protogen.Field) string {
+	expr := "req." + field.GoName
+	if field.Desc.Kind() == protoreflect.StringKind {
+		return expr + ` != ""`
+	}
+	if field.Desc.Kind() == protoreflect.BoolKind {
+		return expr
+	}
+	return expr + " != 0"
+}
+func httpValueExpr(expr string, field *protogen.Field, repeatedElement bool) (string, bool, error) {
+	if field.Desc.IsMap() || field.Desc.Kind() == protoreflect.MessageKind || field.Desc.Kind() == protoreflect.GroupKind {
+		return "", false, fmt.Errorf("message and map values are unsupported")
+	}
+	if field.Desc.IsList() && !repeatedElement {
+		return "", false, fmt.Errorf("repeated value requires a loop")
+	}
+	if field.Desc.HasPresence() {
+		return "", false, fmt.Errorf("fields with presence are unsupported")
+	}
+	switch field.Desc.Kind() {
+	case protoreflect.StringKind:
+		return expr, false, nil
+	case protoreflect.BoolKind:
+		return "strconv.FormatBool(" + expr + ")", true, nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return "strconv.Itoa(int(" + expr + "))", true, nil
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return "strconv.FormatInt(" + expr + ", 10)", true, nil
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return "strconv.FormatUint(uint64(" + expr + "), 10)", true, nil
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return "strconv.FormatUint(" + expr + ", 10)", true, nil
+	case protoreflect.FloatKind:
+		return "strconv.FormatFloat(float64(" + expr + "), 'f', -1, 32)", true, nil
+	case protoreflect.DoubleKind:
+		return "strconv.FormatFloat(" + expr + ", 'f', -1, 64)", true, nil
+	case protoreflect.EnumKind:
+		return "strconv.Itoa(int(" + expr + "))", true, nil
+	default:
+		return "", false, fmt.Errorf("kind %s is unsupported", field.Desc.Kind())
+	}
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if !seen[value] {
+			seen[value] = true
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func replaceHTTPImports(code string, imports httpImportNames) string {
+	for old, replacement := range map[string]string{
+		"context":   imports.Context,
+		"bytes":     imports.Bytes,
+		"fmt":       imports.Fmt,
+		"io":        imports.IO,
+		"http":      imports.HTTP,
+		"url":       imports.URL,
+		"protojson": imports.ProtoJSON,
+		"strconv":   imports.Strconv,
+		"strings":   imports.Strings,
+	} {
+		if replacement != "" && replacement != old {
+			code = strings.ReplaceAll(code, old+".", replacement+".")
+		}
+	}
+	return code
+}
+
+func helperPrefix(filename string) string {
+	var b strings.Builder
+	for i, r := range filename {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || (i > 0 && r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	prefix := strings.Trim(b.String(), "_")
+	if prefix == "" {
+		return "Generated"
+	}
+	if prefix[0] >= '0' && prefix[0] <= '9' {
+		return "Generated_" + prefix
+	}
+	return prefix
 }
 
 func splitLines(s string) []string {

@@ -2,21 +2,12 @@ package main
 
 import "strings"
 
-type paramBinding struct {
-	ProtoName string
-	GoField   string
-}
-
 type methodDesc struct {
-	Name       string
-	FieldName  string // unexported function field name, e.g. "postFn"
-	Request    string
-	Reply      string
-	HTTPMethod string
-	HTTPPath   string
-	PathParams []paramBinding
-	HTTPURL    string // pre-built Go URL expression
-	HasBody    bool
+	Name      string
+	FieldName string // unexported function field name, e.g. "postFn"
+	Request   string
+	Reply     string
+	HTTPCode  string
 }
 
 type serviceDesc struct {
@@ -32,6 +23,17 @@ type fileDesc struct {
 	HasGRPC     bool
 	HasRPCX     bool
 	HasWS       bool
+
+	HelperPrefix string
+	Context      string
+	Bytes        string
+	Fmt          string
+	IO           string
+	HTTP         string
+	URL          string
+	ProtoJSON    string
+	Strconv      string
+	Strings      string
 }
 
 // fieldName converts a method name to an unexported function field name.

@@ -29,8 +29,8 @@ func generateClient(pkg string, services []*serviceDesc) string {
 	return renderTemplate("client", clientTmplContent, &fileDesc{PackageName: pkg, Services: services})
 }
 
-func generateHTTPClient(pkg string, services []*serviceDesc) string {
-	return renderTemplate("http-client", httpTmplContent, &fileDesc{PackageName: pkg, Services: services})
+func generateHTTPClient(data *fileDesc) string {
+	return renderTemplate("http-client", httpTmplContent, data)
 }
 
 func generateGRPCClient(pkg string, services []*serviceDesc) string {
